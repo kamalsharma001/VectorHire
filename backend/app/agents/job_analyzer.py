@@ -88,23 +88,75 @@ Produce the structured job specification JSON according to instructions:"""
     ) -> JobSpecification:
         """Fallback deterministic heuristic parser if LLM provider is unavailable."""
         title = job_title_hint or "Professional Role"
-        lines = [line.strip() for line in job_description_text.split("\n") if line.strip()]
-        if len(lines) <= 2:
-            sentence_splits = [s.strip() for s in re.split(r"(?:[;\n]+|(?<=[.!?])\s+)", job_description_text) if s.strip()]
-            if len(sentence_splits) > len(lines):
-                lines = sentence_splits
+        raw_lines = [line.strip() for line in job_description_text.split("\n") if line.strip()]
 
-        if not job_title_hint and lines:
-            first_line = lines[0]
-            if len(first_line) < 100 and not any(kw in first_line.lower() for kw in ["requirement", "responsibilit", "qualificat", "accepts", "looking"]):
-                title = first_line.rstrip(".!?")
+        # Extract title from explicit header or clean first line if no hint provided
+        if not job_title_hint and raw_lines:
+            m_title = re.match(r"^title\s*:\s*(.*)$", raw_lines[0], re.IGNORECASE)
+            if m_title:
+                title = m_title.group(1).strip()
+            elif len(raw_lines[0]) < 100 and not any(kw in raw_lines[0].lower() for kw in ["requirement", "responsibilit", "qualificat", "accepts", "looking", "seeking"]):
+                title = raw_lines[0].rstrip(".!?")
+
+        # Decompose compound sections, multi-sentence lines, and introductory statements
+        lines: List[str] = []
+        for raw_line in raw_lines:
+            prefix = ""
+            content = raw_line
+
+            # Check for section header prefixes (e.g. "Mandatory: ...", "Preferred: ...")
+            m_prefix = re.match(r"^(mandatory|required|preferred|responsibilities|duties|qualifications|requirements)\s*:\s*(.*)$", raw_line, re.IGNORECASE)
+            if m_prefix:
+                prefix = m_prefix.group(1).capitalize() + ": "
+                content = m_prefix.group(2)
+            elif not job_title_hint and re.match(r"^title\s*:\s*(.*)$", raw_line, re.IGNORECASE):
+                continue
+
+            # Extract introductory role sentences (e.g. "Seeking a Staff Security Engineer with ...")
+            m_intro = re.match(r"^(?:seeking|looking for|hiring|we are seeking|we are looking for)\s+(?:an?|the)?\s*([A-Za-z0-9\s\-/]+?)\s+(?:with|who has|having)\s+(.*)$", content, re.IGNORECASE)
+            if m_intro:
+                if title == "Professional Role":
+                    title = m_intro.group(1).strip()
+                content = m_intro.group(2)
+
+            # Mask parentheticals to prevent breaking inside acronyms or nested descriptions
+            parens: List[str] = []
+            def _mask_paren(m: re.Match) -> str:
+                parens.append(m.group(0))
+                return f"___DECOMP_PAREN_{len(parens)-1}___"
+            masked = re.sub(r"\([^)]*\)", _mask_paren, content)
+
+            # Split on sentence boundaries (. followed by space/end) or semicolons
+            sub_items = re.split(r";|\.(?:\s+|$)", masked)
+            final_sub_items = []
+            for s in sub_items:
+                s_stripped = s.strip()
+                if not s_stripped:
+                    continue
+                # Split compound qualifications connected by 'and' before key requirement anchors
+                clause_splits = re.split(
+                    r"\s+and\s+(?=(?:\d+\+?\s+years?|experience\s+in|proven\s+track|bachelor|master|ph\.?d|certified|certification|active\s+|must\s+have|strong\s+))",
+                    s_stripped,
+                    flags=re.IGNORECASE,
+                )
+                final_sub_items.extend(clause_splits)
+
+            for item in final_sub_items:
+                for idx, p in enumerate(parens):
+                    item = item.replace(f"___DECOMP_PAREN_{idx}___", p)
+                item = item.strip()
+                if len(item) >= 4:
+                    if prefix and not item.lower().startswith(prefix.lower()):
+                        lines.append(f"{prefix}{item}")
+                    else:
+                        lines.append(item)
 
         requirements: List[JobRequirement] = []
         seen_names = set()
         req_idx = 1
 
         for line in lines:
-            clean = re.sub(r"^[-*•\d.)\s]+", "", line).strip()
+            clean = re.sub(r"^(?:[-*•\s]+|(?:\d+[\.)]\s+))", "", line).strip()
             if len(clean) < 8 or req_idx > 12:
                 continue
 

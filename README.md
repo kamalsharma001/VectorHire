@@ -3,8 +3,7 @@
 Turn batches of resumes into explainable, evidence-backed candidate comparisons.
 
 VectorHire is an AI-assisted recruitment screening tool that evaluates multiple resumes against a single job description. It combines semantic and lexical matching, structured requirements, evidence verification, and deterministic scoring to help recruiters understand how candidates compare and what supports each assessment.
-
-- **Live Demo:** `[Add live demo URL after deployment]`
+- **Live Application:** [Open VectorHire](https://vectorhire-platform.vercel.app)
 
 > **Important:** VectorHire is a recruiter decision-support tool, not an autonomous hiring system. Final hiring decisions remain with humans.
 

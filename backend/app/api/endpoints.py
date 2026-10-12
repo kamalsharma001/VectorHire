@@ -65,13 +65,23 @@ router = APIRouter()
 @router.get("/api/health", response_model=HealthResponse, tags=["Health"], include_in_schema=False)
 async def get_health() -> HealthResponse:
     """Returns application readiness status, active models, and operational limits."""
-    active_model = settings.GEMINI_MODEL if settings.LLM_PROVIDER.lower() == "gemini" else settings.GROQ_MODEL
-    fallback_model = settings.GEMINI_FALLBACK_MODEL if settings.LLM_PROVIDER.lower() == "gemini" else settings.GROQ_FALLBACK_MODEL
+    provider = settings.LLM_PROVIDER.strip().lower()
+    if provider == "gemini":
+        active_model = settings.GEMINI_MODEL
+        fallback_model = settings.GEMINI_FALLBACK_MODEL
+        cross_fallback = f"groq:{settings.GROQ_MODEL}"
+    else:
+        active_model = settings.GROQ_MODEL
+        fallback_model = settings.GROQ_FALLBACK_MODEL
+        cross_fallback = None
+
     return HealthResponse(
         status="healthy",
         version="1.1.0",
+        llm_provider=settings.LLM_PROVIDER,
         active_llm_model=active_model,
         fallback_llm_model=fallback_model,
+        cross_provider_fallback=cross_fallback,
         embedding_model=settings.EMBEDDING_MODEL,
         max_batch_size=settings.MAX_BATCH_SIZE,
         max_file_size_mb=settings.MAX_FILE_SIZE_MB,

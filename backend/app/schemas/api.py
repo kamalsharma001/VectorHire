@@ -19,8 +19,13 @@ class HealthResponse(BaseModel):
     """System health, readiness, and operational configuration status."""
     status: str = Field(default="healthy", description="Application readiness status")
     version: str = Field(default="1.1.0", description="VectorHire API version")
-    active_llm_model: str = Field(..., description="Configured primary Groq LLM model")
-    fallback_llm_model: str = Field(..., description="Configured fallback Groq LLM model")
+    llm_provider: str = Field(default="gemini", description="Configured active LLM provider strategy ('gemini' or 'groq')")
+    active_llm_model: str = Field(..., description="Configured primary LLM model for the active provider")
+    fallback_llm_model: Optional[str] = Field(None, description="Configured internal model fallback for the active provider")
+    cross_provider_fallback: Optional[str] = Field(
+        default=None,
+        description="Configured cross-provider fallback target when primary provider fails"
+    )
     embedding_model: str = Field(..., description="Local ONNX embedding model")
     max_batch_size: int = Field(..., description="Maximum allowed resumes per batch")
     max_file_size_mb: int = Field(..., description="Maximum allowed file size in MB")

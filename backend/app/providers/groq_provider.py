@@ -8,6 +8,7 @@ import asyncio
 import json
 import logging
 import random
+import time
 from typing import Any, Dict, List, Optional
 from groq import (
     APIConnectionError,
@@ -32,6 +33,21 @@ from app.providers.base_llm import BaseLLMProvider
 
 logger = logging.getLogger(__name__)
 
+# Module-level in-memory cooldown tracker to prevent retry storms on quota exhaustion
+_GROQ_COOLDOWN_UNTIL: float = 0.0
+_DEFAULT_GROQ_COOLDOWN_SECONDS: float = 60.0
+
+
+def is_permanent_groq_error(exc: BaseException) -> bool:
+    """Returns True if the error is permanent (404, not found, invalid auth)."""
+    if isinstance(exc, APIStatusError) and exc.status_code in {400, 401, 403, 404}:
+        return True
+    msg = str(exc).lower()
+    return any(marker in msg for marker in [
+        "404", "model_not_found", "not_found", "not found",
+        "invalid_api_key", "invalid api key", "unauthorized", "401", "403"
+    ])
+
 
 def is_daily_quota_exhausted(exc: BaseException) -> bool:
     """Returns True if the exception indicates hard daily quota exhaustion rather than transient RPM/TPM."""
@@ -43,9 +59,11 @@ def is_daily_quota_exhausted(exc: BaseException) -> bool:
 
 def is_retryable_transient_error(exc: BaseException) -> bool:
     """Returns True if the error is transient and should be retried with backoff on the same model."""
-    msg = str(exc).lower()
+    if is_permanent_groq_error(exc):
+        return False
     if is_daily_quota_exhausted(exc):
         return False
+    msg = str(exc).lower()
     if "request too large" in msg or "maximum context length" in msg:
         return False
     if isinstance(exc, (RateLimitError, APIConnectionError)):
@@ -201,6 +219,15 @@ class GroqProvider(BaseLLMProvider):
         Synchronously requests structured JSON from Groq.
         Attempts primary model first. If primary model fails, falls back to fallback_model.
         """
+        global _GROQ_COOLDOWN_UNTIL
+        now = time.time()
+        if now < _GROQ_COOLDOWN_UNTIL:
+            remaining = int(_GROQ_COOLDOWN_UNTIL - now)
+            raise ProviderAPIError(
+                f"Groq provider is in cooldown for {remaining}s due to recent quota exhaustion. "
+                "Failing fast to trigger offline fallback."
+            )
+
         client = self._get_sync_client()
         temp = temperature if temperature is not None else self.temperature
         chosen_primary = model or self.primary_model
@@ -208,16 +235,23 @@ class GroqProvider(BaseLLMProvider):
         try:
             return self._execute_sync_call(client, chosen_primary, messages, temp)
         except Exception as primary_err:
+            if is_daily_quota_exhausted(primary_err):
+                _GROQ_COOLDOWN_UNTIL = time.time() + _DEFAULT_GROQ_COOLDOWN_SECONDS
+                logger.warning("Groq daily quota exhausted on %s. Setting cooldown until +%ds.", chosen_primary, _DEFAULT_GROQ_COOLDOWN_SECONDS)
+
             logger.warning(
                 "Primary Groq model '%s' failed: %s. Attempting fallback model '%s'",
                 chosen_primary,
                 str(primary_err)[:200],
                 self.fallback_model,
             )
-            if self.fallback_model and self.fallback_model != chosen_primary:
+            # Only try fallback model if failure wasn't account-wide daily quota exhaustion
+            if self.fallback_model and self.fallback_model != chosen_primary and not is_daily_quota_exhausted(primary_err):
                 try:
                     return self._execute_sync_call(client, self.fallback_model, messages, temp)
                 except Exception as fallback_err:
+                    if is_daily_quota_exhausted(fallback_err):
+                        _GROQ_COOLDOWN_UNTIL = time.time() + _DEFAULT_GROQ_COOLDOWN_SECONDS
                     logger.error(
                         "Fallback Groq model '%s' also failed: %s",
                         self.fallback_model,
@@ -242,6 +276,15 @@ class GroqProvider(BaseLLMProvider):
         Asynchronously requests structured JSON from Groq.
         Attempts primary model first. If primary model fails, falls back to fallback_model.
         """
+        global _GROQ_COOLDOWN_UNTIL
+        now = time.time()
+        if now < _GROQ_COOLDOWN_UNTIL:
+            remaining = int(_GROQ_COOLDOWN_UNTIL - now)
+            raise ProviderAPIError(
+                f"Groq provider is in cooldown for {remaining}s due to recent quota exhaustion. "
+                "Failing fast to trigger offline fallback."
+            )
+
         client = self._get_async_client()
         temp = temperature if temperature is not None else self.temperature
         chosen_primary = model or self.primary_model
@@ -249,16 +292,22 @@ class GroqProvider(BaseLLMProvider):
         try:
             return await self._execute_async_call(client, chosen_primary, messages, temp)
         except Exception as primary_err:
+            if is_daily_quota_exhausted(primary_err):
+                _GROQ_COOLDOWN_UNTIL = time.time() + _DEFAULT_GROQ_COOLDOWN_SECONDS
+                logger.warning("Groq daily quota exhausted in async on %s. Setting cooldown until +%ds.", chosen_primary, _DEFAULT_GROQ_COOLDOWN_SECONDS)
+
             logger.warning(
                 "Primary Groq model '%s' failed in async execution: %s. Attempting fallback model '%s'",
                 chosen_primary,
                 str(primary_err)[:200],
                 self.fallback_model,
             )
-            if self.fallback_model and self.fallback_model != chosen_primary:
+            if self.fallback_model and self.fallback_model != chosen_primary and not is_daily_quota_exhausted(primary_err):
                 try:
                     return await self._execute_async_call(client, self.fallback_model, messages, temp)
                 except Exception as fallback_err:
+                    if is_daily_quota_exhausted(fallback_err):
+                        _GROQ_COOLDOWN_UNTIL = time.time() + _DEFAULT_GROQ_COOLDOWN_SECONDS
                     logger.error(
                         "Fallback Groq model '%s' also failed in async execution: %s",
                         self.fallback_model,
