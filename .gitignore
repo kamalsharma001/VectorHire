@@ -1,19 +1,40 @@
-# Python cache
+# Python cache & build
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
 
-# virtual environment
+# Testing & Coverage (Keep tests private locally)
+.pytest_cache/
+tests/
+backend/tests/
+frontend/src/test/
+pytest.ini
+backend/pytest.ini
+*.log
+
+# Virtual environments
 venv/
+.venv/
+env/
 
-# environment variables
+# Environment variables & secrets
 .env
-
-# Streamlit secrets
+.env.local
+.env.*.local
 .streamlit/
 
-# sample resumes
+# Node & Frontend build
+node_modules/
+dist/
+.vite/
+
+# Sample resumes / fixtures
 resumes/
 
-# OS files
+# OS and Editor files
 .DS_Store
 Thumbs.db
+.idea/
+.vscode/
+*.swp

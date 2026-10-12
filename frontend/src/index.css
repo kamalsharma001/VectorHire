@@ -1,0 +1,137 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-[#F8FAFC] text-[#0F172A] font-sans;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Custom vibrant scrollbars for tables and drawers */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #F1F5F9;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #CBD5E1;
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #0284C7;
+  }
+
+  /* Accessible focus rings */
+  :focus-visible {
+    @apply outline-none ring-2 ring-[#06B6D4] ring-offset-2 ring-offset-white;
+  }
+}
+
+@layer components {
+  /* Vibrant Deep Oceanic Primary Action */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-white bg-gradient-to-r from-[#0369A1] via-[#0284C7] to-[#075985] hover:from-[#0284C7] hover:to-[#0369A1] shadow-glow-blue hover:shadow-lg active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none focus:outline-none focus:ring-2 focus:ring-[#06B6D4] focus:ring-offset-2;
+  }
+
+  /* Clean Elevated Secondary Action */
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-medium text-[#0F172A] bg-white border border-[#E2E8F0] hover:border-[#BAE6FD] hover:bg-[#F0F9FF] hover:text-[#0369A1] transition-all duration-200 shadow-subtle hover:shadow-md active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-[#0369A1]/30;
+  }
+
+  /* Luminous Mint Accent Action */
+  .btn-accent {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-semibold text-[#0B5B44] bg-gradient-to-r from-[#00D294] to-[#00B882] hover:brightness-105 transition-all duration-200 shadow-glow-mint active:scale-[0.98] disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-[#00D294];
+  }
+
+  /* Selective Violet AI Accent Action */
+  .btn-violet {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-semibold text-white bg-gradient-to-r from-[#8B5CF6] to-[#7C3AED] hover:from-[#7C3AED] hover:to-[#6D28D9] transition-all duration-200 shadow-glow-violet active:scale-[0.98] disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-[#8B5CF6];
+  }
+
+  /* Minimal Ghost Action */
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg font-medium text-[#64748B] hover:text-[#0369A1] hover:bg-[#F0F9FF] transition-all duration-150 active:scale-[0.98] disabled:opacity-50 focus:outline-none;
+  }
+
+  /* Modern Layered Surface Cards */
+  .card-modern {
+    @apply bg-white border border-[#E2E8F0] rounded-2xl shadow-subtle hover:border-[#BAE6FD]/80 transition-all duration-200;
+  }
+
+  /* Interactive Hover Card */
+  .card-interactive {
+    @apply bg-white border border-[#E2E8F0] rounded-2xl shadow-subtle hover:-translate-y-0.5 hover:shadow-card-hover hover:border-[#38BDF8]/60 transition-all duration-200;
+  }
+
+  .card-editorial {
+    @apply bg-white border border-[#E2E8F0] rounded-2xl shadow-subtle hover:border-[#BAE6FD]/80 transition-all duration-200;
+  }
+
+  .card-enterprise {
+    @apply bg-white border border-[#E2E8F0] rounded-2xl shadow-subtle hover:border-[#BAE6FD]/80 transition-all duration-200;
+  }
+
+  /* Active Stage Moving Light Accent */
+  @keyframes activeRingRotate {
+    0% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+    100% {
+      background-position: 0% 50%;
+    }
+  }
+
+  .active-stage-card {
+    position: relative;
+    background: #FFFFFF;
+    border-radius: 0.75rem;
+    z-index: 1;
+  }
+
+  .active-stage-card::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: 0.85rem;
+    background: linear-gradient(90deg, #0369A1, #06B6D4, #00D294, #8B5CF6, #06B6D4, #0369A1);
+    background-size: 300% 300%;
+    animation: activeRingRotate 3.5s ease infinite;
+    z-index: -1;
+  }
+
+  /* Vibrant Gradient Text Utility */
+  .gradient-text-ocean {
+    @apply bg-gradient-to-r from-[#075985] via-[#0369A1] to-[#06B6D4] bg-clip-text text-transparent;
+  }
+
+  .gradient-text-ai {
+    @apply bg-gradient-to-r from-[#0369A1] via-[#06B6D4] to-[#8B5CF6] bg-clip-text text-transparent;
+  }
+}
+
+/* Custom styled Range Inputs for Rubric Calibration */
+input[type="range"] {
+  @apply accent-[#0369A1] transition-all;
+}
+input[type="range"]:focus {
+  @apply outline-none ring-2 ring-[#06B6D4]/40;
+}
+
+/* Reduced motion accessibility support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

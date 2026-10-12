@@ -1,328 +1,251 @@
-# AI HR Recruitment Multi-Agent System
+# VectorHire — Evidence-Driven Resume Intelligence
 
-![Python](https://img.shields.io/badge/Python-3.10+-blue)
-![Framework](https://img.shields.io/badge/Framework-Streamlit-red)
-![LLM](https://img.shields.io/badge/LLM-Groq-green)
-![License](https://img.shields.io/badge/License-MIT-yellow)
+Turn batches of resumes into explainable, evidence-backed candidate comparisons.
 
-An **AI-powered HR assistant** that automates resume analysis, candidate evaluation, and hiring decisions using a **multi-agent architecture powered by LLMs**.
+VectorHire is an AI-assisted recruitment screening tool that evaluates multiple resumes against a single job description. It combines semantic and lexical matching, structured requirements, evidence verification, and deterministic scoring to help recruiters understand how candidates compare and what supports each assessment.
 
-The system helps recruiters quickly analyze resumes, identify skill gaps, rank candidates, generate interview questions, and produce hiring insights.
+- **Live Demo:** `[Add live demo URL after deployment]`
 
----
-
-# Live Demo
-
-Try the deployed application:
-
-**https://ai-hr-agent-kamalsharma001.streamlit.app**
+> **Important:** VectorHire is a recruiter decision-support tool, not an autonomous hiring system. Final hiring decisions remain with humans.
 
 ---
 
-# Features
+## The Problem
 
-* Resume parsing from **PDF files**
-* Resume summarization using **LLM**
-* Skill extraction from **job descriptions and resumes**
-* **Skill gap analysis**
-* **AI-based candidate evaluation**
-* Candidate **ranking system**
-* **Hiring decision agent**
-* **Interview question generation**
-* **Hiring insights generation**
-* Candidate comparison **tables and charts**
-* **Downloadable hiring report**
+Resume screening can be inconsistent when it relies on keyword matching alone or unverified AI-generated judgments. Relevant experience may be expressed using different terminology, while a keyword appearing in a resume does not necessarily demonstrate competency.
+
+VectorHire addresses this challenge by connecting candidate assessments to resume evidence and applying a structured, consistent evaluation process.
 
 ---
 
-# Screenshots
+## Key Features
 
-To demonstrate the system, we use the following example job description.
-
-### Example Job Description
-
-Looking for a **Python Developer** with:
-
-* Strong Python skills
-* Experience in **FastAPI or Django**
-* Knowledge of **Machine Learning**
-* Understanding of **REST APIs**
-* Good problem-solving skills
-
-The AI HR Recruitment Agent analyzes uploaded resumes against this job description and produces candidate evaluations.
+- **Dynamic job requirements:** Extract and structure requirements from a job description into a job-specific rubric.
+- **Batch resume screening:** Evaluate up to 10 resumes in one screening session.
+- **Hybrid matching:** Combine semantic similarity, lexical matching, and controlled terminology normalization.
+- **Evidence provenance:** Validate extracted evidence against source text and character offsets.
+- **Contextual verification:** Assess whether evidence genuinely supports a requirement, accounting for negation and disclaimers.
+- **Deterministic scoring:** Calculate candidate scores using normalized requirement weights rather than asking an LLM to invent the final score.
+- **Hard-gate handling:** Keep specified eligibility requirements distinguishable from overall match scores and flag cases requiring human review.
+- **Uncertainty awareness:** Distinguish supported, uncertain, missing, and contradictory or unverifiable evidence.
+- **Interview preparation:** Generate targeted interview questions based on requirements and evidence gaps.
+- **Provider resilience:** Use Google Gemini as the configured primary LLM, with Groq as the cross-provider fallback.
 
 ---
 
-### Main UI
+## Product Preview
 
-The recruiter dashboard where users enter the job description and upload candidate resumes for analysis.
+| Recruiter Dashboard | Candidate Comparison |
+| :---: | :---: |
+| ![Recruiter Dashboard](screenshots/main_ui.png) | ![Candidate Comparison](screenshots/comparison.png) |
 
-![Main UI](screenshots/main_ui.png)
-
----
-
-### Candidate Comparison
-
-The system compares candidates based on evaluation score and skill match percentage.
-
-![Candidate Comparison](screenshots/comparison.png)
+| Decision Support | Interview Questions |
+| :---: | :---: |
+| ![Decision Support](screenshots/decision.png) | ![Interview Questions](screenshots/questions.png) |
 
 ---
 
-### AI Hiring Decision
-
-The Hiring Decision Agent recommends the best candidate based on evaluation results and provides reasoning and next steps.
-
-![Hiring Decision](screenshots/decision.png)
-
----
-
-### Interview Questions
-
-The system generates tailored interview questions for each candidate based on the job description and resume.
-
-![Interview Questions](screenshots/questions.png)
-
----
-
-# Multi-Agent Architecture
-
-This project is designed as a **multi-agent AI system**, where specialized agents collaborate to evaluate candidates and assist recruiters.
-
-### Agents in the System
-
-**Resume Parsing Agent**
-
-Extracts text and structured information from candidate resumes (PDF).
-
-**Resume Summarization Agent**
-
-Uses an LLM to generate a concise candidate summary.
-
-**Skill Extraction Agent**
-
-Identifies skills from resumes and job descriptions.
-
-**Skill Gap Analysis Agent**
-
-Compares required job skills with candidate skills to identify gaps.
-
-**Candidate Evaluation Agent**
-
-Uses LLM reasoning to evaluate candidate suitability.
-
-**Candidate Ranking Agent**
-
-Ranks multiple candidates based on evaluation score.
-
-**Hiring Decision Agent**
-
-Provides final hiring recommendations such as:
-
-* Hire
-* Hold
-* Reject
-
-**Interview Question Generator Agent**
-
-Generates personalized interview questions based on candidate profiles.
-
-**Hiring Insights Agent**
-
-Produces insights and recommendations for recruiters.
-
----
-
-# System Workflow
+## How It Works
 
 ```
-Recruiter Input
+Job Description
       │
       ▼
-Upload Resumes + Job Description
+Requirement Extraction and Dynamic Rubric
       │
       ▼
-Resume Parsing Agent
+Resume Upload and Document Validation
       │
       ▼
-Skill Extraction Agent
+Semantic and Lexical Evidence Retrieval
       │
       ▼
-Skill Gap Analysis Agent
+Source Provenance and Contextual Verification
       │
       ▼
-Candidate Evaluation Agent
+Deterministic Scoring and Eligibility Checks
       │
       ▼
-Candidate Ranking Agent
-      │
-      ▼
-Hiring Decision Agent
-      │
-      ▼
-Interview Question Generator
-      │
-      ▼
-Recruiter Dashboard Output
+Candidate Comparison and Interview Questions
 ```
+
+### LLM interpretation, deterministic scoring
+
+LLMs help interpret job descriptions, structure requirements, evaluate contextual evidence, and generate interview questions. Evidence provenance checks validate extracted source text. The deterministic scoring engine calculates final scores using the active rubric, while hard-gate results remain separately identifiable.
+
+This separation reduces dependence on unconstrained LLM-generated scores, but it does not eliminate model errors or guarantee that every assessment is correct.
 
 ---
 
-# Tech Stack
+## Technology Stack
 
-### Programming Language
-
-* Python
-
-### Framework
-
-* Streamlit
-
-### AI / LLM
-
-* Groq API
-
-### Libraries
-
-* Pandas
-* PyPDF
-* Matplotlib
+| Layer | Technologies |
+| :--- | :--- |
+| **Frontend** | React, JavaScript, Vite, Tailwind CSS |
+| **Backend** | Python, FastAPI, Pydantic v2, Uvicorn |
+| **Primary LLM** | Google Gemini (`gemini-2.5-flash`) |
+| **Fallback LLM** | Groq Cloud, with configured model fallbacks (`openai/gpt-oss-20b`, `qwen/qwen3.8-27b`) |
+| **Embeddings** | FastEmbed, `BAAI/bge-small-en-v1.5` |
+| **Matching and scoring** | Semantic and lexical matching, deterministic rubric scoring |
+| **Document processing** | PDF text extraction, DOCX and TXT support |
+| **Testing tools** | Pytest and Vitest |
 
 ---
 
-# Project Structure
+## Project Structure
 
-```
-ai-hr-agent
-│
-├── app
-│   ├── agent.py
-│   ├── main.py
-│   ├── resume_parser.py
-│   ├── schemas.py
-│
-├── ui.py
-├── requirements.txt
-├── README.md
+```text
+VectorHire/
+├── backend/
+│   ├── app/
+│   │   ├── agents/
+│   │   ├── api/
+│   │   ├── core/
+│   │   ├── orchestration/
+│   │   ├── providers/
+│   │   ├── schemas/
+│   │   └── services/
+│   ├── requirements.txt
+│   └── .env.example
+├── frontend/
+│   ├── src/
+│   ├── public/
+│   ├── package.json
+│   ├── vercel.json
+│   └── .env.example
+├── screenshots/
+├── render.yaml
 ├── LICENSE
-├── .gitignore
+└── README.md
 ```
 
 ---
 
-# Installation
+## Getting Started
 
-Clone the repository
+### Prerequisites
 
+- Python version supported by the backend dependencies (Python 3.10+ recommended).
+- Node.js and npm.
+- API keys for the LLM providers you intend to use for live evaluation.
+
+### 1. Set up the backend
+
+From the repository root:
+
+```bash
+cd backend
+python -m venv .venv
 ```
-git clone https://github.com/kamalsharma001/ai-hr-agent.git
+
+Activate the virtual environment.
+
+**Windows PowerShell:**
+```powershell
+.\.venv\Scripts\Activate.ps1
 ```
 
-Navigate into the project
-
+**macOS/Linux:**
+```bash
+source .venv/bin/activate
 ```
-cd ai-hr-agent
-```
 
-Install dependencies
+Install the dependencies:
 
-```
+```bash
 pip install -r requirements.txt
 ```
 
-Run the application
+Create a local `.env` file using `backend/.env.example` as the reference. Configure your provider keys and required settings. Never commit real credentials.
 
+Start the API:
+
+```bash
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
-streamlit run ui.py
+
+The backend runs at `http://localhost:8000`. API documentation is available at `http://localhost:8000/docs` if enabled by the application configuration.
+
+### 2. Set up the frontend
+
+Open a separate terminal from the repository root:
+
+```bash
+cd frontend
+npm install
 ```
+
+Create a local `.env` file using `frontend/.env.example` and configure the backend URL:
+
+```env
+VITE_API_BASE_URL=http://localhost:8000
+```
+
+*(For local development with the Vite proxy, `VITE_API_BASE_URL` can also be left empty).*
+
+Start the frontend:
+
+```bash
+npm run dev
+```
+
+Open the local URL printed by Vite (typically `http://localhost:5173`).
 
 ---
 
-# Environment Variables
+## Deployment
 
-This project requires a **Groq API key**.
+VectorHire is configured for separate backend and frontend hosting.
 
-Create a folder:
+### Backend — Render
 
-```
-.streamlit
-```
+The root `render.yaml` defines the backend service configuration.
 
-Inside create:
+- **Root directory:** `backend`
+- **Build command:** `pip install -r requirements.txt`
+- **Start command:** `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+- **Health check:** `/health`
 
-```
-secrets.toml
-```
+Configure the required provider keys, model settings, and CORS origins in the Render service environment.
 
-Add your API key:
+### Frontend — Vercel
 
-```
-GROQ_API_KEY = "your_groq_api_key"
-```
+Deploy the `frontend/` directory as a Vite application.
 
-The application securely accesses the key using:
+- **Root directory:** `frontend`
+- **Build command:** `npm run build`
+- **Output directory:** `dist`
+- **API URL:** Set `VITE_API_BASE_URL` to the deployed backend URL.
 
-```
-st.secrets["GROQ_API_KEY"]
-```
+The existing `frontend/vercel.json` provides SPA routing support. Configure the backend CORS allowlist to include the deployed frontend origin.
 
----
-
-# Deployment
-
-This project can be deployed easily using **Streamlit Cloud**.
-
-Steps:
-
-1. Push the project to GitHub
-2. Login to Streamlit Cloud
-3. Connect your GitHub repository
-4. Select `ui.py` as the entry point
-5. Add your `GROQ_API_KEY` in Streamlit Secrets
-6. Deploy the application
+> **Deployment status:** The repository contains deployment configuration, but the live demo URL must be added only after a public deployment has been completed and verified.
 
 ---
 
-# Example Use Case
+## Privacy and Responsible Use
 
-Recruiters can:
-
-* Upload candidate resumes
-* Provide a job description
-* Automatically receive:
-
-  * Skill gap analysis
-  * Candidate ranking
-  * Hiring recommendation
-  * Interview questions
-  * Hiring insights
-
-This significantly **reduces manual screening effort**.
+- Screening sessions use in-memory application state rather than a persistent candidate repository.
+- Uploaded files may pass through temporary processing or framework-managed upload buffers. In-memory sessions alone do not guarantee that no temporary files are created.
+- PDF processing requires an extractable text layer. Scanned image-only PDFs may not be readable without OCR.
+- Current operational limits are up to 10 resumes per batch and 10 MB per file, subject to active configuration.
+- Missing evidence is not proof that a candidate lacks a skill.
+- Candidate scores, evidence, and eligibility flags should be reviewed by a human. VectorHire should not be the sole basis for employment decisions.
 
 ---
 
-# Future Improvements
+## Limitations
 
-* Support for multiple resume formats
-* Integration with ATS systems
-* Advanced skill ontology matching
-* Vector database for semantic search
-* Multi-agent orchestration frameworks (**CrewAI / LangGraph**)
-
----
-
-# Author
-
-**Kamal Sharma**
-CSE (AI & ML) – Chandigarh University
-
-Built using **Python, Streamlit, and LLM-powered agents**.
+- Evaluation quality depends on resume quality, job-description clarity, model behavior, and the available evidence.
+- Provider availability, rate limits, quotas, and latency can affect processing.
+- Passing automated tests does not prove live provider availability or guarantee real-world hiring accuracy.
+- OCR, persistent candidate management, and external ATS integrations should not be assumed unless separately implemented.
 
 ---
 
-# License
+## Author
 
-This project is licensed under the **MIT License**.
-
-See the full license here:
-[MIT License](LICENSE)
+**Kamal Sharma**  
+CSE AIML  
+Chandigarh University  
+GitHub: [kamalsharma001](https://github.com/kamalsharma001)
