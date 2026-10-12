@@ -12,3 +12,4 @@ pytest-asyncio>=1.4.0
 httpx>=0.28.0
 python-dotenv>=1.0.0
 python-docx
+python-multipart
