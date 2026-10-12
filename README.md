@@ -31,19 +31,6 @@ VectorHire addresses this challenge by connecting candidate assessments to resum
 - **Interview preparation:** Generate targeted interview questions based on requirements and evidence gaps.
 - **Provider resilience:** Use Google Gemini as the configured primary LLM, with Groq as the cross-provider fallback.
 
----
-
-## Product Preview
-
-| Recruiter Dashboard | Candidate Comparison |
-| :---: | :---: |
-| ![Recruiter Dashboard](screenshots/main_ui.png) | ![Candidate Comparison](screenshots/comparison.png) |
-
-| Decision Support | Interview Questions |
-| :---: | :---: |
-| ![Decision Support](screenshots/decision.png) | ![Interview Questions](screenshots/questions.png) |
-
----
 
 ## How It Works
 
