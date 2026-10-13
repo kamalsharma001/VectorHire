@@ -1,12 +1,10 @@
 import React from 'react';
 import {
-  Loader2,
   FileText,
   ShieldCheck,
   Search,
   Sparkles,
   CheckCircle2,
-  Clock,
   Layers,
   Calculator,
 } from 'lucide-react';
@@ -18,7 +16,8 @@ export function EvaluationView() {
     jobSpec,
     evaluationPhase,
     currentStageIndex = 0,
-    elapsedSeconds = 0.0,
+    completedStages = [],
+    isScreening = false,
     pipelineStages = [],
   } = useScreening();
 
@@ -36,8 +35,7 @@ export function EvaluationView() {
     <div className="max-w-3xl mx-auto space-y-7 py-4 motion-safe:animate-fade-in">
       {/* Editorial Header */}
       <div className="text-center space-y-3">
-        <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-[#F0F9FF] border border-[#BAE6FD] text-xs font-bold text-[#0369A1] shadow-glow-cyan">
-          <Loader2 className="w-3.5 h-3.5 animate-spin text-[#06B6D4]" />
+        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#F0F9FF] border border-[#BAE6FD] text-xs font-bold text-[#0369A1]">
           <span>Stage 04 • Candidate Evaluation in Progress</span>
         </div>
 
@@ -49,14 +47,6 @@ export function EvaluationView() {
           Screening <strong className="text-[#0F172A]">{fileCount} resume{fileCount === 1 ? '' : 's'}</strong> against{' '}
           <strong className="text-[#0369A1]">{jobSpec?.job_title || 'Role'}</strong> with zero hallucination tolerance.
         </p>
-
-        {/* Live Elapsed Time Pill */}
-        <div className="pt-1">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-white border border-[#BAE6FD] text-xs font-mono font-bold text-[#0369A1] shadow-subtle">
-            <Clock className="w-3.5 h-3.5 text-[#06B6D4] animate-pulse" />
-            <span>Elapsed: {typeof elapsedSeconds === 'number' ? elapsedSeconds.toFixed(1) : elapsedSeconds}s</span>
-          </div>
-        </div>
       </div>
 
       {/* Live Honest Pipeline Phase Notice with Ambient Pulsing Glow */}
@@ -93,37 +83,56 @@ export function EvaluationView() {
           <div className="grid grid-cols-1 gap-3">
             {pipelineStages.map((phase, idx) => {
               const Icon = stageIcons[idx] || Sparkles;
-              const isCompleted = idx < currentStageIndex;
-              const isActive = idx === currentStageIndex;
-              const isPending = idx > currentStageIndex;
+              const isCompleted = completedStages.includes(idx);
+              const isActive = idx === currentStageIndex && isScreening && !isCompleted;
+              const isPending = !isCompleted && !isActive;
 
               return (
                 <div
                   key={phase.step}
                   className={`p-4 rounded-xl border transition-all duration-200 flex items-start gap-3.5 ${
                     isActive
-                      ? 'bg-[#F0F9FF] border-[#06B6D4] shadow-glow-cyan'
+                      ? 'bg-[#F0F9FF] border-[#06B6D4]'
                       : isCompleted
                       ? 'bg-white border-[#A3F3DC] shadow-subtle'
                       : 'bg-[#F8FAFC] border-[#E2E8F0] opacity-80'
                   }`}
                 >
-                  <div
-                    className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm transition-transform ${
-                      isActive
-                        ? 'bg-[#0369A1] text-white scale-105'
-                        : isCompleted
-                        ? 'bg-[#00D294] text-white'
-                        : 'bg-[#F1F5F9] text-[#94A3B8] border border-[#E2E8F0]'
-                    }`}
-                  >
-                    {isCompleted ? (
-                      <CheckCircle2 className="w-5 h-5 text-white" />
-                    ) : isActive ? (
-                      <Icon className="w-5 h-5 text-white animate-pulse" />
-                    ) : (
-                      <Icon className="w-4.5 h-4.5" />
+                  <div className="relative flex items-center justify-center w-10 h-10 flex-shrink-0">
+                    {isActive && (
+                      <>
+                        {/* Dedicated 40px circular track */}
+                        <div
+                          className="absolute inset-0 rounded-full border border-[#BAE6FD]"
+                          aria-hidden="true"
+                        />
+                        {/* Orbital light rotating continuously while evaluation is pending */}
+                        <div
+                          className={`absolute inset-0 rounded-full pointer-events-none ${
+                            isScreening ? 'orbital-light-runner' : ''
+                          }`}
+                          aria-hidden="true"
+                        >
+                          <div className="w-2.5 h-2.5 rounded-full bg-[#06B6D4] absolute top-[-5px] left-1/2 -translate-x-1/2" />
+                        </div>
+                      </>
                     )}
+
+                    <div
+                      className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm transition-transform ${
+                        isActive
+                          ? 'bg-[#0369A1] text-white'
+                          : isCompleted
+                          ? 'bg-[#00D294] text-white'
+                          : 'bg-[#F1F5F9] text-[#94A3B8] border border-[#E2E8F0]'
+                      }`}
+                    >
+                      {isCompleted ? (
+                        <CheckCircle2 className="w-4.5 h-4.5 text-white" />
+                      ) : (
+                        <Icon className="w-4 h-4" />
+                      )}
+                    </div>
                   </div>
 
                   <div className="min-w-0 flex-1">

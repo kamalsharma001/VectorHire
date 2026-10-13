@@ -42,7 +42,14 @@ const ScreeningContext = createContext(null);
 export function ScreeningProvider({ children }) {
   // Backend connection & health
   const [backendHealth, setBackendHealth] = useState(null);
+  const [healthStatus, setHealthStatus] = useState('checking'); // 'checking' | 'waking_up' | 'ready' | 'unavailable'
   const [isHealthChecking, setIsHealthChecking] = useState(true);
+  const [healthError, setHealthError] = useState(null);
+
+  // In-flight health promise & poll cancel refs to prevent duplicate requests
+  const healthPromiseRef = React.useRef(null);
+  const pollTimerRef = React.useRef(null);
+  const cancelWarmupRef = React.useRef(false);
 
   // Workflow stages: 'job' | 'requirements' | 'resumes' | 'evaluation' | 'results'
   // (with backwards-compatible aliases 'intake' -> 'job', 'upload' -> 'resumes')
@@ -72,7 +79,7 @@ export function ScreeningProvider({ children }) {
   const [isScreening, setIsScreening] = useState(false);
   const [evaluationPhase, setEvaluationPhase] = useState('idle');
   const [currentStageIndex, setCurrentStageIndex] = useState(0);
-  const [elapsedSeconds, setElapsedSeconds] = useState(0.0);
+  const [completedStages, setCompletedStages] = useState([]);
   const [screeningResult, setScreeningResult] = useState(null);
 
   // Candidate detail inspection drawer
@@ -81,22 +88,135 @@ export function ScreeningProvider({ children }) {
   // Global alerts/errors
   const [errorMessage, setErrorMessage] = useState(null);
 
-  // Health check on initial load
-  const checkHealth = useCallback(async () => {
-    setIsHealthChecking(true);
-    try {
-      const data = await api.getHealth();
-      setBackendHealth(data);
-    } catch {
-      setBackendHealth({ status: 'unreachable' });
-    } finally {
-      setIsHealthChecking(false);
+  /**
+   * Performs a single health probe, deduplicating concurrent calls via singleton promise.
+   */
+  const probeHealth = useCallback(async (options = {}) => {
+    if (healthPromiseRef.current) {
+      return healthPromiseRef.current;
     }
+
+    const promise = (async () => {
+      try {
+        const data = await api.getHealth(options);
+        return data;
+      } finally {
+        healthPromiseRef.current = null;
+      }
+    })();
+
+    healthPromiseRef.current = promise;
+    return promise;
   }, []);
 
+  // Active loop identifier to immediately supersede older loops
+  const activeLoopIdRef = React.useRef(0);
+
+  /**
+   * Bounded warm-up loop tailored for Render Free spin-downs.
+   * Max 6 attempts (~30s total with backoff: 0s, 2s, 3s, 4s, 5s, 6s).
+   */
+  const warmUpBackend = useCallback(async (opts = {}) => {
+    const { isManualRetry = false, maxRetries = 5, initialDelayMs = 2000 } = opts;
+    
+    // Clear any pending poll timer and invalidate existing loop
+    if (pollTimerRef.current) {
+      clearTimeout(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+    const currentLoopId = ++activeLoopIdRef.current;
+
+    // If backend is already known ready and this is not a manual retry, no need to re-poll
+    if (!isManualRetry && backendHealth?.status === 'healthy') {
+      setHealthStatus('ready');
+      setIsHealthChecking(false);
+      return backendHealth;
+    }
+
+    setIsHealthChecking(true);
+    setHealthError(null);
+    if (isManualRetry || healthStatus === 'unavailable') {
+      setHealthStatus('checking');
+    }
+
+    let delay = initialDelayMs;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      if (activeLoopIdRef.current !== currentLoopId) break;
+
+      try {
+        // Attempt single health check with a 6-second timeout
+        const data = await probeHealth({ timeoutMs: 6000 });
+        if (activeLoopIdRef.current !== currentLoopId) break;
+
+        if (data && data.status === 'healthy') {
+          setBackendHealth(data);
+          setHealthStatus('ready');
+          setHealthError(null);
+          setIsHealthChecking(false);
+          return data;
+        }
+      } catch (err) {
+        if (activeLoopIdRef.current !== currentLoopId) break;
+
+        // Safe console diagnostic without leaking secrets
+        if (typeof console !== 'undefined' && console.warn) {
+          console.warn(`[VectorHire] Health probe attempt ${attempt + 1}/${maxRetries + 1} failed:`, err?.message);
+        }
+
+        // On failure before last retry, transition to waking_up (Render cold start)
+        if (attempt < maxRetries) {
+          setHealthStatus('waking_up');
+          // Wait with progressive backoff before next attempt
+          await new Promise((resolve) => {
+            pollTimerRef.current = setTimeout(resolve, delay);
+          });
+          if (activeLoopIdRef.current !== currentLoopId) break;
+          delay = Math.min(delay + 1000, 6000);
+        } else {
+          // Bounded retries exhausted
+          setBackendHealth({ status: 'unreachable' });
+          setHealthStatus('unavailable');
+          setHealthError(err?.message || 'Unable to connect to the evaluation service.');
+        }
+      }
+    }
+
+    if (activeLoopIdRef.current === currentLoopId) {
+      setIsHealthChecking(false);
+    }
+    return null;
+  }, [backendHealth, healthStatus, probeHealth]);
+
+  /**
+   * Manual refresh/check method exposed to UI components.
+   */
+  const checkHealth = useCallback(async () => {
+    return warmUpBackend({ isManualRetry: true, maxRetries: 4, initialDelayMs: 2000 });
+  }, [warmUpBackend]);
+
+  /**
+   * Ensures backend is ready before triggering intensive actions (e.g., Evaluate Resumes).
+   */
+  const ensureBackendReady = useCallback(async () => {
+    if (backendHealth?.status === 'healthy') {
+      return true;
+    }
+    const result = await warmUpBackend({ isManualRetry: false, maxRetries: 4, initialDelayMs: 2500 });
+    return result?.status === 'healthy';
+  }, [backendHealth, warmUpBackend]);
+
+  // Initial mount: immediately warm backend in the background without blocking render
   useEffect(() => {
-    checkHealth();
-  }, [checkHealth]);
+    warmUpBackend({ isManualRetry: false, maxRetries: 5, initialDelayMs: 2000 });
+    return () => {
+      activeLoopIdRef.current++;
+      if (pollTimerRef.current) {
+        clearTimeout(pollTimerRef.current);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /**
    * Extracts text from uploaded JD file (.pdf, .docx, .txt)
@@ -170,7 +290,7 @@ export function ScreeningProvider({ children }) {
   };
 
   /**
-   * Executes batch resume screening via POST /analyze-resumes with honest 5-stage progression and live timer
+   * Executes batch resume screening via POST /analyze-resumes-stream with genuine stage handling
    */
   const handleStartScreening = async () => {
     if (isScreening) return;
@@ -183,49 +303,48 @@ export function ScreeningProvider({ children }) {
       return;
     }
 
+    // If backend is waking up or not yet confirmed ready, attempt readiness check first
+    if (backendHealth?.status !== 'healthy') {
+      setEvaluationPhase('Waking up VectorHire evaluation service...');
+      setIsScreening(true);
+      setActiveStepInternal('evaluation');
+      setCurrentStageIndex(0);
+      setCompletedStages([]);
+      
+      const ready = await ensureBackendReady();
+      if (!ready) {
+        setErrorMessage('The evaluation service is temporarily unavailable. Please try again in a moment.');
+        setIsScreening(false);
+        setActiveStepInternal('resumes');
+        return;
+      }
+    }
+
     setIsScreening(true);
     setActiveStepInternal('evaluation');
     setCurrentStageIndex(0);
-    setElapsedSeconds(0.0);
-    setEvaluationPhase('Preparing candidate documents and running validation gates...');
+    setCompletedStages([]);
+    setEvaluationPhase('Validating candidate document format, integrity, and resume structure...');
     setErrorMessage(null);
 
-    const startTime = Date.now();
-    const intervalId = setInterval(() => {
-      setElapsedSeconds(parseFloat(((Date.now() - startTime) / 1000).toFixed(1)));
-    }, 100);
-
-    const stageTimer1 = setTimeout(() => {
-      setCurrentStageIndex(1);
-      setEvaluationPhase('Extracting candidate sections, qualifications, and project evidence...');
-    }, 1500);
-
-    const stageTimer2 = setTimeout(() => {
-      setCurrentStageIndex(2);
-      setEvaluationPhase('Matching requirements and retrieving candidate evidence spans...');
-    }, 4000);
-
-    const stageTimer3 = setTimeout(() => {
-      setCurrentStageIndex(3);
-      setEvaluationPhase('Verifying source provenance and contextual capability support...');
-    }, 7500);
-
-    const stageTimer4 = setTimeout(() => {
-      setCurrentStageIndex(4);
-      setEvaluationPhase('Calibrating deterministic rubric scorecards and ranking candidate results...');
-    }, 11500);
-
     try {
-      const result = await api.analyzeResumes({
+      const result = await api.analyzeResumesStream({
         files: selectedFiles,
         jobSpec: jobSpec,
+        onStageStart: ({ stage_index, message, stage_title }) => {
+          setCurrentStageIndex(stage_index);
+          if (message) setEvaluationPhase(message);
+        },
+        onStageComplete: ({ stage_index, message }) => {
+          setCompletedStages((prev) => (prev.includes(stage_index) ? prev : [...prev, stage_index]));
+          if (stage_index < 4) {
+            setCurrentStageIndex(stage_index + 1);
+          }
+          if (message) setEvaluationPhase(message);
+        },
       });
 
-      clearInterval(intervalId);
-      clearTimeout(stageTimer1);
-      clearTimeout(stageTimer2);
-      clearTimeout(stageTimer3);
-      clearTimeout(stageTimer4);
+      setCompletedStages([0, 1, 2, 3, 4]);
       setCurrentStageIndex(5); // all stages complete
 
       if (!result || result.total_successful === 0 || !result.ranked_candidates || result.ranked_candidates.length === 0) {
@@ -244,19 +363,9 @@ export function ScreeningProvider({ children }) {
         setInspectedCandidateId(result.ranked_candidates[0].candidate_id);
       }
     } catch (err) {
-      clearInterval(intervalId);
-      clearTimeout(stageTimer1);
-      clearTimeout(stageTimer2);
-      clearTimeout(stageTimer3);
-      clearTimeout(stageTimer4);
       setErrorMessage(err.message || 'Screening execution failed.');
       setActiveStepInternal('resumes');
     } finally {
-      clearInterval(intervalId);
-      clearTimeout(stageTimer1);
-      clearTimeout(stageTimer2);
-      clearTimeout(stageTimer3);
-      clearTimeout(stageTimer4);
       setIsScreening(false);
       setEvaluationPhase('idle');
     }
@@ -292,13 +401,17 @@ export function ScreeningProvider({ children }) {
     setIsScreening(false);
     setEvaluationPhase('idle');
     setCurrentStageIndex(0);
-    setElapsedSeconds(0.0);
+    setCompletedStages([]);
   };
 
   const value = {
     backendHealth,
+    healthStatus,
+    healthError,
     isHealthChecking,
     checkHealth,
+    warmUpBackend,
+    ensureBackendReady,
     activeStep,
     setActiveStep,
     rawJobText,
@@ -318,7 +431,7 @@ export function ScreeningProvider({ children }) {
     isScreening,
     evaluationPhase,
     currentStageIndex,
-    elapsedSeconds,
+    completedStages,
     pipelineStages: PIPELINE_STAGES,
     handleStartScreening,
     screeningResult,

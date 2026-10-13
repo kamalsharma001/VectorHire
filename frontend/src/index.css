@@ -75,17 +75,20 @@
     @apply bg-white border border-[#E2E8F0] rounded-2xl shadow-subtle hover:border-[#BAE6FD]/80 transition-all duration-200;
   }
 
-  /* Active Stage Moving Light Accent */
-  @keyframes activeRingRotate {
-    0% {
-      background-position: 0% 50%;
+  /* Active Stage Orbital Light */
+  @keyframes activeMarkerOrbit {
+    from {
+      transform: rotate(0deg);
     }
-    50% {
-      background-position: 100% 50%;
+    to {
+      transform: rotate(360deg);
     }
-    100% {
-      background-position: 0% 50%;
-    }
+  }
+
+  .orbital-light-runner {
+    animation: activeMarkerOrbit 2.5s linear infinite;
+    transform-origin: center center;
+    will-change: transform;
   }
 
   .active-stage-card {
@@ -123,5 +126,9 @@ input[type="range"]:focus {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+
+  .orbital-light-runner {
+    animation: none !important;
   }
 }

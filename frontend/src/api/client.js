@@ -4,9 +4,9 @@
  * Centralizes endpoint URLs, payload formatting, error unwrapping, and network resilience.
  */
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
+export const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
 
-class ApiError extends Error {
+export class ApiError extends Error {
   constructor(message, status = null, details = null) {
     super(message);
     this.name = 'ApiError';
@@ -56,18 +56,34 @@ async function handleResponse(response) {
 export const api = {
   /**
    * GET /health
-   * Verifies backend readiness, active Groq LLM model, embedding model, and operational limits.
+   * Verifies backend readiness, active LLM model, embedding model, and operational limits.
    */
-  async getHealth() {
+  async getHealth(options = {}) {
+    const { timeoutMs = 8000, signal } = options;
+    const controller = new AbortController();
+    const effectiveSignal = signal || controller.signal;
+    let timerId = null;
+
+    if (timeoutMs && !signal) {
+      timerId = setTimeout(() => controller.abort(), timeoutMs);
+    }
+
     try {
       const response = await fetch(`${API_BASE}/health`, {
         method: 'GET',
         headers: { Accept: 'application/json' },
+        signal: effectiveSignal,
       });
       return await handleResponse(response);
     } catch (err) {
       if (err instanceof ApiError) throw err;
-      throw new ApiError('Unable to connect to VectorHire backend API. Is the server running on port 8000?', 0);
+      const isAbort = err?.name === 'AbortError' || effectiveSignal.aborted;
+      const friendlyMsg = isAbort
+        ? 'Backend health check timed out while waiting for a response.'
+        : 'Unable to connect to the VectorHire backend evaluation service.';
+      throw new ApiError(friendlyMsg, 0, { originalError: err?.message, isAbort });
+    } finally {
+      if (timerId) clearTimeout(timerId);
     }
   },
 
@@ -158,6 +174,105 @@ export const api = {
       if (err instanceof ApiError) throw err;
       throw new ApiError(err.message || 'Batch screening evaluation failed.', 0);
     }
+  },
+
+  /**
+   * POST /analyze-resumes-stream
+   * Multipart batch upload with genuine real-time Server-Sent Events (SSE) stage progression.
+   */
+  async analyzeResumesStream({ files, jobSpec, onStageStart, onStageComplete }) {
+    if (!files || files.length === 0) {
+      throw new ApiError('At least one PDF resume must be uploaded.', 400);
+    }
+    if (!jobSpec) {
+      throw new ApiError('Job specification is required for candidate evaluation.', 422);
+    }
+
+    const formData = new FormData();
+    for (const file of files) {
+      formData.append('resumes', file);
+    }
+    formData.append('job_spec', JSON.stringify(jobSpec));
+
+    let response;
+    try {
+      response = await fetch(`${API_BASE}/analyze-resumes-stream`, {
+        method: 'POST',
+        headers: {
+          Accept: 'text/event-stream',
+        },
+        body: formData,
+      });
+    } catch (err) {
+      if (err instanceof ApiError) throw err;
+      throw new ApiError(err.message || 'Unable to connect to evaluation stream.', 0);
+    }
+
+    if (!response.ok) {
+      return await handleResponse(response);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let buffer = '';
+    let finalResult = null;
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split('\n\n');
+        buffer = parts.pop() || '';
+
+        for (const part of parts) {
+          if (!part.trim()) continue;
+
+          let eventType = 'message';
+          let dataStr = '';
+
+          for (const line of part.split('\n')) {
+            if (line.startsWith('event: ')) {
+              eventType = line.slice(7).trim();
+            } else if (line.startsWith('data: ')) {
+              dataStr = line.slice(6);
+            }
+          }
+
+          if (!dataStr) continue;
+
+          let parsedData;
+          try {
+            parsedData = JSON.parse(dataStr);
+          } catch {
+            parsedData = dataStr;
+          }
+
+          if (eventType === 'stage_start') {
+            if (onStageStart) onStageStart(parsedData);
+          } else if (eventType === 'stage_complete') {
+            if (onStageComplete) onStageComplete(parsedData);
+          } else if (eventType === 'complete') {
+            finalResult = parsedData;
+          } else if (eventType === 'error') {
+            const errMsg =
+              typeof parsedData === 'object' && parsedData?.error
+                ? parsedData.error
+                : String(parsedData);
+            throw new ApiError(errMsg, 422, parsedData);
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    if (!finalResult) {
+      throw new ApiError('Evaluation stream finished without returning results.', 500);
+    }
+
+    return finalResult;
   },
 
   /**

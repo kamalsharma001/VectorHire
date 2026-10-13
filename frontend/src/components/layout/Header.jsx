@@ -17,14 +17,27 @@ import {
 } from 'lucide-react';
 import { useScreening } from '../../context/ScreeningContext';
 import { Logo } from '../common/Logo';
+import { API_BASE } from '../../api/client';
 
 export function Header() {
-  const { backendHealth, isHealthChecking, checkHealth, resetSession } = useScreening();
+  const {
+    backendHealth,
+    healthStatus = 'checking',
+    isHealthChecking,
+    checkHealth,
+    resetSession,
+  } = useScreening();
   const [showConfirmReset, setShowConfirmReset] = useState(false);
   const [showHealthModal, setShowHealthModal] = useState(false);
   const [copiedField, setCopiedField] = useState(null);
 
-  const isHealthy = backendHealth && backendHealth.status === 'healthy';
+  const isHealthy = healthStatus === 'ready' || (backendHealth && backendHealth.status === 'healthy');
+  const isWakingUp = healthStatus === 'waking_up';
+  const isChecking = isHealthChecking || healthStatus === 'checking';
+  const isDev = import.meta.env.DEV;
+
+  // Derive displayable health URL safely
+  const healthUrl = API_BASE ? `${API_BASE}/health` : '/health';
 
   const copyToClipboard = (text, field) => {
     if (!text) return;
@@ -56,18 +69,29 @@ export function Header() {
               {isHealthy && (
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#00D294] opacity-75" />
               )}
+              {isWakingUp && (
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
+              )}
               <span
                 className={`relative inline-flex rounded-full h-2.5 w-2.5 transition-colors ${
                   isHealthy
                     ? 'bg-[#00D294] shadow-[0_0_8px_rgba(0,210,148,0.8)]'
-                    : isHealthChecking
+                    : isWakingUp
+                    ? 'bg-[#06B6D4] shadow-[0_0_8px_rgba(6,182,212,0.8)]'
+                    : isChecking
                     ? 'bg-amber-400'
                     : 'bg-[#E11D48]'
                 }`}
               />
             </span>
             <span className="text-xs font-semibold text-[#475569] group-hover:text-[#0369A1] transition-colors hidden md:inline">
-              {isHealthChecking ? 'Checking...' : isHealthy ? 'System Ready' : 'Offline'}
+              {isHealthy
+                ? 'System Ready'
+                : isWakingUp
+                ? 'Waking Up...'
+                : isChecking
+                ? 'Checking...'
+                : 'Offline'}
             </span>
           </button>
 
@@ -167,25 +191,49 @@ export function Header() {
                     Operational
                   </span>
                 </div>
-              ) : (
-                <div className="p-4 rounded-xl bg-[#FFF1F2] border border-[#FECDD3] text-[#9F1239] space-y-2.5 shadow-sm">
-                  <div className="flex items-center gap-2 font-bold text-xs">
-                    <AlertCircle className="w-4.5 h-4.5 text-[#E11D48] flex-shrink-0" />
-                    <span>Backend Service Offline or Unreachable</span>
+              ) : isWakingUp ? (
+                <div className="p-4 rounded-xl bg-[#F0F9FF] border border-[#BAE6FD] text-[#0369A1] space-y-2.5 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 font-bold text-xs text-[#0F172A]">
+                      <RefreshCw className="w-4 h-4 text-[#06B6D4] animate-spin flex-shrink-0" />
+                      <span>Waking up VectorHire...</span>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full bg-white text-[#0369A1] border border-[#BAE6FD] text-[10px] font-bold">
+                      Starting Up
+                    </span>
                   </div>
                   <p className="text-[11px] text-[#475569] leading-relaxed">
-                    The frontend could not connect to the API at <code className="px-1.5 py-0.5 rounded bg-white border border-[#FECDD3] text-[#E11D48] font-mono">http://localhost:8000/health</code>. Ensure the backend server is running:
+                    The evaluation service is starting. This can take a little while on the free hosting tier. Please wait.
                   </p>
-                  <div className="p-2.5 rounded-lg bg-slate-900 text-slate-100 font-mono text-[11px] flex items-center justify-between">
-                    <span>cd backend; uvicorn app.main:app --reload</span>
-                    <button
-                      onClick={() => copyToClipboard('cd backend; uvicorn app.main:app --reload', 'cmd')}
-                      className="text-slate-400 hover:text-white p-1 transition-colors"
-                      title="Copy command"
-                    >
-                      {copiedField === 'cmd' ? <Check className="w-3.5 h-3.5 text-[#00D294]" /> : <Copy className="w-3.5 h-3.5" />}
-                    </button>
+                </div>
+              ) : isChecking ? (
+                <div className="p-4 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] text-[#475569] space-y-2.5 shadow-sm">
+                  <div className="flex items-center gap-2 font-bold text-xs text-[#0F172A]">
+                    <RefreshCw className="w-4 h-4 text-[#0369A1] animate-spin flex-shrink-0" />
+                    <span>Checking Service Readiness...</span>
                   </div>
+                  <p className="text-[11px] text-[#475569] leading-relaxed">
+                    Connecting to the VectorHire backend API service at{' '}
+                    <code className="px-1.5 py-0.5 rounded bg-white border border-[#CBD5E1] text-[#0F172A] font-mono break-all">
+                      {healthUrl}
+                    </code>
+                    ...
+                  </p>
+                </div>
+              ) : (
+                <div className="p-4 rounded-xl bg-[#FFF1F2] border border-[#FECDD3] text-[#9F1239] space-y-2.5 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 font-bold text-xs text-[#E11D48]">
+                      <AlertCircle className="w-4.5 h-4.5 text-[#E11D48] flex-shrink-0" />
+                      <span>The evaluation service is temporarily unavailable.</span>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full bg-white text-[#E11D48] border border-[#FECDD3] text-[10px] font-bold">
+                      Offline
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-[#475569] leading-relaxed">
+                    Please try again in a moment. If the issue persists, the backend hosting container may be restarting.
+                  </p>
                 </div>
               )}
 
@@ -328,7 +376,13 @@ export function Header() {
                   className="btn-secondary text-xs py-2 px-3.5 flex items-center gap-2 disabled:opacity-60"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isHealthChecking ? 'animate-spin text-[#0369A1]' : ''}`} />
-                  <span>{isHealthChecking ? 'Checking...' : 'Refresh Status'}</span>
+                  <span>
+                    {isHealthChecking
+                      ? 'Checking...'
+                      : isHealthy
+                      ? 'Refresh Status'
+                      : 'Retry Connection'}
+                  </span>
                 </button>
                 <button
                   onClick={() => setShowHealthModal(false)}

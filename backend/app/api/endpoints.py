@@ -7,6 +7,7 @@ Defines public endpoints:
 - POST /generate-questions: Evidence-grounded interview question generation.
 """
 
+import asyncio
 import json
 import logging
 import re
@@ -25,8 +26,9 @@ try:
 except Exception:
     pass
 
-from typing import List, Optional, Tuple
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
+from typing import List, Optional, Tuple, Union
+from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile, status
+from starlette.responses import Response, StreamingResponse
 
 from app.agents.job_analyzer import JobAnalysisAgent
 from app.agents.question_generator import QuestionGeneratorAgent
@@ -170,17 +172,360 @@ async def analyze_job(request: JobAnalysisRequest) -> JobAnalysisResponse:
         )
 
 
+async def stream_resume_analysis(
+    file_payloads: List[Tuple[bytes, str]],
+    job_spec: str,
+):
+    """
+    Executes the 5 deterministic pipeline stages with genuine SSE progress events:
+    Stage 1: Preparing Candidate Documents (validation gate & integrity checks)
+    Stage 2: Extracting Resume Content (profile extraction & passage decomposition)
+    Stage 3: Matching Requirements & Retrieving Evidence (embeddings & hybrid retrieval)
+    Stage 4: Verifying Supporting Evidence (provenance & contextual support audit)
+    Stage 5: Calculating Scores & Preparing Results (deterministic rubric math & ranking)
+    """
+    settings = get_settings()
+    queue: asyncio.Queue = asyncio.Queue()
+
+    async def emit(event_type: str, payload):
+        data_str = json.dumps(payload) if isinstance(payload, (dict, list)) else str(payload)
+        await queue.put(f"event: {event_type}\ndata: {data_str}\n\n")
+
+    async def runner():
+        try:
+            # 1. Validate batch size
+            if not file_payloads or len(file_payloads) == 0:
+                await emit("error", {"error": "At least one resume file must be uploaded."})
+                return
+
+            if len(file_payloads) > settings.MAX_BATCH_SIZE:
+                await emit("error", {
+                    "error": (
+                        f"Batch size of {len(file_payloads)} resumes exceeds the configured maximum limit "
+                        f"of {settings.MAX_BATCH_SIZE} resumes."
+                    )
+                })
+                return
+
+            # 2. Parse and validate JobSpecification
+            try:
+                spec_data = json.loads(job_spec)
+                validated_spec = JobSpecification.model_validate(spec_data)
+            except Exception as exc:
+                await emit("error", {"error": f"Invalid job_spec format: {str(exc)}"})
+                return
+
+            max_bytes = settings.MAX_FILE_SIZE_MB * 1024 * 1024
+            valid_candidates_raw: List[Tuple[bytes, str, str]] = []
+            ingestion_failures: List[PipelineErrorRecord] = []
+
+            # =====================================================================
+            # Stage 1: Preparing Candidate Documents
+            # =====================================================================
+            await emit("stage_start", {
+                "stage_index": 0,
+                "stage_id": "01",
+                "stage_title": "Preparing Candidate Documents",
+                "message": "Validating candidate document format, integrity, and resume structure...",
+            })
+
+            validator = ResumeValidationService()
+            for idx, (content, orig_filename) in enumerate(file_payloads, start=1):
+                filename = orig_filename or f"resume_{idx}.pdf"
+                stem = re.sub(r"[^a-zA-Z0-9_\-]", "", filename.split(".")[0])[:12] or f"c{idx}"
+                candidate_id = f"cand_{idx:02d}_{stem}_{uuid4().hex[:4]}"
+
+                try:
+                    if len(content) == 0:
+                        ingestion_failures.append(
+                            PipelineErrorRecord(
+                                candidate_id=candidate_id,
+                                filename=filename,
+                                stage=PipelineStage.INGESTING,
+                                error_type="EmptyFileError",
+                                error_message="Uploaded document is empty (0 bytes).",
+                            )
+                        )
+                        continue
+
+                    if len(content) > max_bytes:
+                        ingestion_failures.append(
+                            PipelineErrorRecord(
+                                candidate_id=candidate_id,
+                                filename=filename,
+                                stage=PipelineStage.INGESTING,
+                                error_type="FileTooLargeError",
+                                error_message=(
+                                    f"File size ({len(content) / (1024 * 1024):.1f}MB) exceeds "
+                                    f"limit of {settings.MAX_FILE_SIZE_MB}MB."
+                                ),
+                            )
+                        )
+                        continue
+
+                    validation_result = await validator.validate_document_async(content, filename)
+
+                    if validation_result.status == ResumeValidationStatus.VALID_RESUME:
+                        valid_candidates_raw.append((content, filename, candidate_id))
+                    elif validation_result.status == ResumeValidationStatus.NOT_RESUME:
+                        ingestion_failures.append(
+                            PipelineErrorRecord(
+                                candidate_id=candidate_id,
+                                filename=filename,
+                                stage=PipelineStage.INGESTING,
+                                error_type="NonResumeDocumentError",
+                                error_message=(
+                                    f"Document '{filename}' was rejected by the resume validation gate: "
+                                    f"{validation_result.failure_message or 'Document does not exhibit resume or CV structure.'}"
+                                ),
+                            )
+                        )
+                    elif validation_result.status == ResumeValidationStatus.UNCERTAIN:
+                        ingestion_failures.append(
+                            PipelineErrorRecord(
+                                candidate_id=candidate_id,
+                                filename=filename,
+                                stage=PipelineStage.INGESTING,
+                                error_type="AmbiguousDocumentError",
+                                error_message=(
+                                    f"Document '{filename}' could not be verified as a resume: "
+                                    f"{validation_result.failure_message or 'Please provide a clear resume or replace this file.'}"
+                                ),
+                            )
+                        )
+                    else:
+                        ingestion_failures.append(
+                            PipelineErrorRecord(
+                                candidate_id=candidate_id,
+                                filename=filename,
+                                stage=PipelineStage.INGESTING,
+                                error_type="UnreadableDocumentError",
+                                error_message=(
+                                    f"Document '{filename}' could not be read: "
+                                    f"{validation_result.failure_message or 'Encrypted, corrupted, or image-only PDF lacking extractable text.'}"
+                                ),
+                            )
+                        )
+                except DocumentProcessingError as doc_err:
+                    ingestion_failures.append(
+                        PipelineErrorRecord(
+                            candidate_id=candidate_id,
+                            filename=filename,
+                            stage=PipelineStage.INGESTING,
+                            error_type="DocumentProcessingError",
+                            error_message=str(doc_err),
+                        )
+                    )
+                except Exception as exc:
+                    ingestion_failures.append(
+                        PipelineErrorRecord(
+                            candidate_id=candidate_id,
+                            filename=filename,
+                            stage=PipelineStage.INGESTING,
+                            error_type=type(exc).__name__,
+                            error_message=f"Failed to ingest document: {str(exc)}",
+                        )
+                    )
+
+            await emit("stage_complete", {
+                "stage_index": 0,
+                "stage_id": "01",
+                "stage_title": "Preparing Candidate Documents",
+                "message": f"Document validation gate completed: {len(valid_candidates_raw)} valid candidate document(s) verified.",
+            })
+
+            if len(valid_candidates_raw) == 0:
+                error_details = "; ".join([
+                    f"{err.filename}: {err.error_message}"
+                    for err in ingestion_failures
+                ]) or "All uploaded candidate resumes failed validation."
+                await emit("error", {
+                    "error": f"Candidate evaluation failed for all submitted resumes. Errors: {error_details}"
+                })
+                return
+
+            # =====================================================================
+            # Stage 2: Extracting Resume Content
+            # =====================================================================
+            await emit("stage_start", {
+                "stage_index": 1,
+                "stage_id": "02",
+                "stage_title": "Extracting Resume Content",
+                "message": "Extracting candidate sections, qualifications, credential records, and project history...",
+            })
+
+            valid_candidates_data: List[Tuple[CandidateProfile, str]] = []
+            for content, filename, candidate_id in valid_candidates_raw:
+                try:
+                    profile, raw_text = extract_candidate_profile(content, filename, candidate_id)
+                    valid_candidates_data.append((profile, raw_text))
+                except Exception as exc:
+                    ingestion_failures.append(
+                        PipelineErrorRecord(
+                            candidate_id=candidate_id,
+                            filename=filename,
+                            stage=PipelineStage.EXTRACTING,
+                            error_type=type(exc).__name__,
+                            error_message=f"Failed to extract candidate profile: {str(exc)}",
+                        )
+                    )
+
+            if len(valid_candidates_data) == 0:
+                error_details = "; ".join([
+                    f"{err.filename}: {err.error_message}"
+                    for err in ingestion_failures
+                ]) or "All uploaded candidate resumes failed extraction."
+                await emit("error", {
+                    "error": f"Candidate profile extraction failed for all submitted resumes. Errors: {error_details}"
+                })
+                return
+
+            total_passages = sum(len(c.passages) for c, _ in valid_candidates_data)
+            await emit("stage_complete", {
+                "stage_index": 1,
+                "stage_id": "02",
+                "stage_title": "Extracting Resume Content",
+                "message": f"Resume content extraction completed: {total_passages} passages decomposed across {len(valid_candidates_data)} candidate(s).",
+            })
+
+            # =====================================================================
+            # Stages 3, 4, 5: Matching, Verifying, Scoring
+            # =====================================================================
+            pipeline = EvaluationPipeline()
+
+            async def on_stage_start(idx: int, sid: str, msg: str):
+                titles = {
+                    2: "Matching Requirements & Retrieving Evidence",
+                    3: "Verifying Supporting Evidence",
+                    4: "Calculating Scores & Preparing Results",
+                }
+                await emit("stage_start", {
+                    "stage_index": idx,
+                    "stage_id": sid,
+                    "stage_title": titles.get(idx, ""),
+                    "message": msg,
+                })
+
+            async def on_stage_complete(idx: int, sid: str, msg: str):
+                titles = {
+                    2: "Matching Requirements & Retrieving Evidence",
+                    3: "Verifying Supporting Evidence",
+                    4: "Calculating Scores & Preparing Results",
+                }
+                await emit("stage_complete", {
+                    "stage_index": idx,
+                    "stage_id": sid,
+                    "stage_title": titles.get(idx, ""),
+                    "message": msg,
+                })
+
+            screening_result = await pipeline.evaluate_staged_batch_async(
+                candidates_data=valid_candidates_data,
+                job_spec=validated_spec,
+                on_stage_start=on_stage_start,
+                on_stage_complete=on_stage_complete,
+            )
+
+            all_validation_errors = list(ingestion_failures) + list(screening_result.validation_errors)
+            if screening_result.total_successful == 0:
+                error_details = "; ".join([
+                    f"{err.filename}: {err.error_message}"
+                    for err in all_validation_errors
+                ]) or "All uploaded candidate resumes failed evaluation."
+                await emit("error", {
+                    "error": f"Candidate evaluation failed for all submitted resumes. Errors: {error_details}"
+                })
+            else:
+                final_result = BatchScreeningResult(
+                    job_title=screening_result.job_title,
+                    rubric_version=screening_result.rubric_version,
+                    total_submitted=len(file_payloads),
+                    total_successful=screening_result.total_successful,
+                    total_failed=len(all_validation_errors),
+                    ranked_candidates=screening_result.ranked_candidates,
+                    scorecards=screening_result.scorecards,
+                    validation_errors=all_validation_errors,
+                )
+                await emit("complete", final_result.model_dump())
+
+        except Exception as exc:
+            logger.error("SSE evaluation stream error: %s", exc, exc_info=True)
+            await emit("error", {"error": str(exc)})
+        finally:
+            await queue.put(None)
+
+    task = asyncio.create_task(runner())
+    try:
+        while True:
+            item = await queue.get()
+            if item is None:
+                break
+            yield item
+    finally:
+        if not task.done():
+            task.cancel()
+
+
+@router.post("/analyze-resumes-stream", tags=["Screening"])
+@router.post("/api/analyze-resumes-stream", tags=["Screening"], include_in_schema=False)
+async def analyze_resumes_stream(
+    resumes: List[UploadFile] = File(..., description="Batch of PDF resume files"),
+    job_spec: str = Form(..., description="JSON string of the validated JobSpecification"),
+):
+    """
+    Server-Sent Events (SSE) streaming endpoint providing genuine real-time stage-by-stage
+    progression events across all 5 verification pipeline phases.
+    """
+    file_payloads: List[Tuple[bytes, str]] = []
+    for f in resumes:
+        try:
+            content = await f.read()
+            file_payloads.append((content, f.filename or "resume.pdf"))
+        finally:
+            await f.close()
+
+    return StreamingResponse(
+        stream_resume_analysis(file_payloads=file_payloads, job_spec=job_spec),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
 @router.post("/analyze-resumes", response_model=BatchScreeningResult, tags=["Screening"])
 @router.post("/api/analyze-resumes", response_model=BatchScreeningResult, tags=["Screening"], include_in_schema=False)
 async def analyze_resumes(
+    request: Request,
     resumes: List[UploadFile] = File(..., description="Batch of PDF resume files"),
     job_spec: str = Form(..., description="JSON string of the validated JobSpecification"),
-) -> BatchScreeningResult:
+) -> Union[BatchScreeningResult, Response]:
     """
     Ingests and screens a batch of PDF resumes against the frozen JobSpecification.
     Coordinates document processing, hybrid retrieval, two-stage evidence verification,
-    and deterministic rubric scoring.
+    and deterministic rubric scoring. Supports SSE streaming when requested via Accept header
+    or stream parameter.
     """
+    if request.headers.get("accept") == "text/event-stream" or request.query_params.get("stream") == "true":
+        file_payloads: List[Tuple[bytes, str]] = []
+        for f in resumes:
+            try:
+                content = await f.read()
+                file_payloads.append((content, f.filename or "resume.pdf"))
+            finally:
+                await f.close()
+
+        return StreamingResponse(
+            stream_resume_analysis(file_payloads=file_payloads, job_spec=job_spec),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+            },
+        )
     settings = get_settings()
 
     # 1. Validate batch size
