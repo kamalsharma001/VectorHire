@@ -1,12 +1,10 @@
 import React from 'react';
 import {
-  Loader2,
   FileText,
   ShieldCheck,
   Search,
   Sparkles,
-  CheckCircle2,
-  Clock,
+  Check,
   Layers,
   Calculator,
 } from 'lucide-react';
@@ -18,11 +16,11 @@ export function EvaluationView() {
     jobSpec,
     evaluationPhase,
     currentStageIndex = 0,
-    elapsedSeconds = 0.0,
     pipelineStages = [],
   } = useScreening();
 
   const fileCount = selectedFiles?.length || 0;
+  const jobTitle = jobSpec?.job_title || 'Role';
 
   const stageIcons = [
     FileText,
@@ -33,142 +31,96 @@ export function EvaluationView() {
   ];
 
   return (
-    <div className="max-w-3xl mx-auto space-y-7 py-4 motion-safe:animate-fade-in">
-      {/* Editorial Header */}
-      <div className="text-center space-y-3">
-        <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-gradient-to-r from-[#F0F9FF] to-[#ECFEFF] border border-[#BAE6FD] text-xs font-bold text-[#0369A1] shadow-glow-cyan">
-          <Loader2 className="w-3.5 h-3.5 animate-spin text-[#06B6D4]" />
+    <div className="max-w-3xl mx-auto space-y-6 py-3 px-2 sm:px-0 motion-safe:animate-fade-in">
+      {/* A. Editorial Header (Solid colors, refined hierarchy, no gradients, no elapsed time) */}
+      <div className="text-center space-y-2.5">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#F0F9FF] border border-[#BAE6FD] text-xs font-semibold text-[#0369A1]">
+          <span className="w-2 h-2 rounded-full bg-[#06B6D4]" />
           <span>Stage 04 • Candidate Evaluation in Progress</span>
         </div>
 
-        <h1 className="font-sans text-3xl sm:text-4xl font-bold text-[#0F172A] tracking-tight">
+        <h1 className="font-sans text-2xl sm:text-3xl font-bold text-[#0F172A] tracking-tight">
           Evaluating Candidate Evidence
         </h1>
 
-        <p className="text-xs text-[#475569] max-w-lg mx-auto leading-relaxed">
-          Screening <strong className="text-[#0F172A]">{fileCount} resume{fileCount === 1 ? '' : 's'}</strong> against{' '}
-          <strong className="text-[#0369A1]">{jobSpec?.job_title || 'Role'}</strong> with zero hallucination tolerance.
+        <p className="text-xs sm:text-sm text-[#475569] max-w-lg mx-auto leading-relaxed">
+          Reviewing <strong className="text-[#0F172A]">{fileCount} resume{fileCount === 1 ? '' : 's'}</strong> against{' '}
+          <strong className="text-[#0369A1]">{jobTitle}</strong> requirements.
         </p>
-
-        {/* Live Elapsed Time Pill */}
-        <div className="pt-1">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-white border border-[#BAE6FD] text-xs font-mono font-bold text-[#0369A1] shadow-subtle">
-            <Clock className="w-3.5 h-3.5 text-[#06B6D4] animate-pulse" />
-            <span>Elapsed: {typeof elapsedSeconds === 'number' ? elapsedSeconds.toFixed(1) : elapsedSeconds}s</span>
-          </div>
-        </div>
       </div>
 
-      {/* Live Honest Pipeline Phase Notice with Ambient Pulsing Glow */}
-      <div className="card-modern p-6 sm:p-8 space-y-6 border-[#BAE6FD]/80 shadow-[0_8px_30px_-6px_rgba(3,105,161,0.1)]">
-        <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-[#F0F9FF] via-[#ECFEFF] to-[#E0F2FE] border border-[#BAE6FD] flex items-start gap-3.5 shadow-sm">
-          <div className="w-3 h-3 rounded-full bg-[#06B6D4] animate-ping mt-1 flex-shrink-0" />
-          <div className="space-y-0.5 min-w-0 flex-1">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-[11px] uppercase tracking-wider font-bold text-[#0369A1]">
-                Active Pipeline Stage {Math.min(currentStageIndex + 1, 5)} of 5
-              </span>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/90 border border-[#BAE6FD] text-[10px] font-mono text-[#0284C7] font-bold shadow-subtle">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#06B6D4] animate-pulse" />
-                In Progress
-              </span>
+      {/* Main Container Card (Solid background, subtle solid border, no gradients) */}
+      <div className="bg-white rounded-2xl border border-[#E2E8F0] p-5 sm:p-7 space-y-5 shadow-subtle">
+        
+        {/* Active Evaluation Banner (Solid pale blue bg, solid cyan border, rotating perimeter light) */}
+        <div className="p-4 sm:p-4.5 rounded-xl bg-[#F0F9FF] border border-[#BAE6FD] flex items-center justify-between gap-3.5">
+          <div className="flex items-center gap-3 min-w-0">
+            {/* Active marker with rotating perimeter light indicator */}
+            <div className="relative flex-shrink-0 w-8 h-8 flex items-center justify-center">
+              <div className="absolute inset-0 active-marker-orbiter pointer-events-none" aria-hidden="true">
+                <div className="w-2 h-2 rounded-full bg-[#06B6D4] absolute top-[-3px] left-1/2 -translate-x-1/2 shadow-sm" />
+              </div>
+              <div className="w-8 h-8 rounded-lg bg-[#0369A1] text-white border border-[#06B6D4] flex items-center justify-center">
+                <Sparkles className="w-4 h-4 text-white" />
+              </div>
             </div>
-            <p className="text-xs font-bold text-[#0F172A] truncate">
-              {evaluationPhase !== 'idle' ? evaluationPhase : 'Processing candidate documents...'}
-            </p>
+
+            <div className="min-w-0">
+              <h3 className="text-xs sm:text-sm font-bold text-[#0F172A] truncate">
+                Evaluating candidate evidence
+              </h3>
+              <p className="text-[11px] sm:text-xs text-[#475569] mt-0.5 leading-relaxed">
+                Matching resumes against the job requirements and validating supporting evidence.
+              </p>
+            </div>
           </div>
+
+          <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-[#ECFEFF] text-[#0369A1] border border-[#BAE6FD] flex-shrink-0">
+            In progress
+          </span>
         </div>
 
-        {/* 5 Phased Stages with Connected Visual Step Flow */}
-        <div className="space-y-3.5">
-          <div className="flex items-center justify-between">
+        {/* 5-Stage Verification Workflow (Visual architecture of the evaluation pipeline) */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between px-1">
             <span className="text-[11px] uppercase tracking-wider font-bold text-[#64748B]">
-              Deterministic Pipeline Architecture
+              Evaluation Workflow Architecture
             </span>
-            <span className="text-[10px] font-mono font-semibold text-[#06B6D4]">
-              5-Stage Verification Flow
+            <span className="text-[10px] font-mono font-medium text-[#64748B]">
+              5 Verification Stages
             </span>
           </div>
 
-          <div className="grid grid-cols-1 gap-3">
+          <div className="grid grid-cols-1 gap-2.5">
             {pipelineStages.map((phase, idx) => {
               const Icon = stageIcons[idx] || Sparkles;
-              const isCompleted = idx < currentStageIndex;
-              const isActive = idx === currentStageIndex;
-              const isPending = idx > currentStageIndex;
 
               return (
                 <div
                   key={phase.step}
-                  className={`p-4 rounded-xl border transition-all duration-200 flex items-start gap-3.5 ${
-                    isActive
-                      ? 'active-stage-card shadow-glow-cyan'
-                      : isCompleted
-                      ? 'border-[#A3F3DC] bg-[#E8FBF5]/30 shadow-subtle'
-                      : 'border-[#E2E8F0] bg-[#F8FAFC]/60 opacity-80'
-                  }`}
+                  className="p-3.5 sm:p-4 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] flex items-start gap-3 sm:gap-3.5 transition-colors"
                 >
-                  <div
-                    className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm transition-transform ${
-                      isActive
-                        ? 'bg-gradient-to-br from-[#0369A1] to-[#06B6D4] text-white scale-105'
-                        : isCompleted
-                        ? 'bg-gradient-to-br from-[#00D294] to-[#0B5B44] text-white'
-                        : 'bg-[#F1F5F9] text-[#94A3B8] border border-[#E2E8F0]'
-                    }`}
-                  >
-                    {isCompleted ? (
-                      <CheckCircle2 className="w-5 h-5 text-white" />
-                    ) : isActive ? (
-                      <Icon className="w-5 h-5 text-white animate-pulse" />
-                    ) : (
-                      <Icon className="w-4.5 h-4.5" />
-                    )}
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 bg-[#F1F5F9] text-[#64748B] border border-[#E2E8F0]">
+                    <Icon className="w-4.5 h-4.5 text-[#0369A1]" />
                   </div>
 
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-0 flex-1 pt-0.5">
                     <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`font-mono text-[11px] font-bold ${
-                            isActive
-                              ? 'text-[#0369A1]'
-                              : isCompleted
-                              ? 'text-[#0B5B44]'
-                              : 'text-[#94A3B8]'
-                          }`}
-                        >
+                      <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                        <span className="font-mono text-[11px] font-bold text-[#0369A1]">
                           {phase.step}
                         </span>
-                        <h4
-                          className={`text-xs font-bold transition-colors ${
-                            isActive
-                              ? 'text-[#0369A1]'
-                              : isCompleted
-                              ? 'text-[#0F172A]'
-                              : 'text-[#64748B]'
-                          }`}
-                        >
+                        <h4 className="text-xs sm:text-sm font-semibold text-[#0F172A] truncate">
                           {phase.title}
                         </h4>
                       </div>
 
-                      {/* State Badge */}
-                      {isCompleted ? (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#E8FBF5] text-[#0B5B44] border border-[#A3F3DC]">
-                          Completed
-                        </span>
-                      ) : isActive ? (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#ECFEFF] text-[#0284C7] border border-[#BAE6FD] animate-pulse">
-                          In Progress
-                        </span>
-                      ) : (
-                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#F1F5F9] text-[#64748B]">
-                          Pending
-                        </span>
-                      )}
+                      <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-white text-[#64748B] border border-[#E2E8F0] flex-shrink-0">
+                        Pipeline Stage
+                      </span>
                     </div>
-                    <p className="text-[11px] text-[#475569] mt-1 leading-relaxed">
+
+                    <p className="text-[11px] sm:text-xs text-[#475569] mt-1 leading-relaxed">
                       {phase.description}
                     </p>
                   </div>
@@ -178,22 +130,22 @@ export function EvaluationView() {
           </div>
         </div>
 
-        {/* Batch File Queue Roster */}
+        {/* Batch Document Roster (Solid tags, subtle borders, no gradients) */}
         {selectedFiles && selectedFiles.length > 0 && (
-          <div className="pt-4 border-t border-[#E2E8F0] space-y-2.5">
+          <div className="pt-3.5 border-t border-[#E2E8F0] space-y-2">
             <div className="flex items-center justify-between text-xs">
               <span className="text-[11px] uppercase tracking-wider font-bold text-[#64748B]">
                 Batch Document Roster ({selectedFiles.length})
               </span>
               <span className="text-[11px] text-[#0369A1] font-mono font-semibold">
-                Stateless In-Memory Verification
+                In-Memory Verification
               </span>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5">
               {selectedFiles.map((f, i) => (
                 <span
                   key={i}
-                  className="font-mono text-[11px] px-3 py-1 rounded-lg bg-[#F8FAFC] text-[#0F172A] border border-[#E2E8F0] hover:border-[#BAE6FD] hover:bg-[#F0F9FF] transition-colors truncate max-w-[220px] shadow-subtle"
+                  className="font-mono text-[11px] px-2.5 py-1 rounded-md bg-[#F8FAFC] text-[#0F172A] border border-[#E2E8F0] truncate max-w-[200px]"
                 >
                   {f.name}
                 </span>

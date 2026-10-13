@@ -75,35 +75,26 @@
     @apply bg-white border border-[#E2E8F0] rounded-2xl shadow-subtle hover:border-[#BAE6FD]/80 transition-all duration-200;
   }
 
-  /* Active Stage Moving Light Accent */
-  @keyframes activeRingRotate {
+  /* Active Stage Perimeter Marker Rotation (Solid Colors Only, Confined to Marker) */
+  @keyframes activeMarkerOrbit {
     0% {
-      background-position: 0% 50%;
-    }
-    50% {
-      background-position: 100% 50%;
+      transform: rotate(0deg);
     }
     100% {
-      background-position: 0% 50%;
+      transform: rotate(360deg);
     }
   }
 
   .active-stage-card {
     position: relative;
-    background: #FFFFFF;
+    background: #F0F9FF;
+    border: 1px solid #06B6D4;
     border-radius: 0.75rem;
-    z-index: 1;
   }
 
-  .active-stage-card::before {
-    content: '';
-    position: absolute;
-    inset: -2px;
-    border-radius: 0.85rem;
-    background: linear-gradient(90deg, #0369A1, #06B6D4, #00D294, #8B5CF6, #06B6D4, #0369A1);
-    background-size: 300% 300%;
-    animation: activeRingRotate 3.5s ease infinite;
-    z-index: -1;
+  .active-marker-orbiter {
+    animation: activeMarkerOrbit 2.4s linear infinite;
+    transform-origin: 50% 50%;
   }
 
   /* Vibrant Gradient Text Utility */

@@ -37,7 +37,7 @@ export const PIPELINE_STAGES = [
   },
 ];
 
-const ScreeningContext = createContext(null);
+export const ScreeningContext = createContext(null);
 
 export function ScreeningProvider({ children }) {
   // Backend connection & health
@@ -187,46 +187,14 @@ export function ScreeningProvider({ children }) {
     setActiveStepInternal('evaluation');
     setCurrentStageIndex(0);
     setElapsedSeconds(0.0);
-    setEvaluationPhase('Preparing candidate documents and running validation gates...');
+    setEvaluationPhase('Evaluating candidate evidence');
     setErrorMessage(null);
-
-    const startTime = Date.now();
-    const intervalId = setInterval(() => {
-      setElapsedSeconds(parseFloat(((Date.now() - startTime) / 1000).toFixed(1)));
-    }, 100);
-
-    const stageTimer1 = setTimeout(() => {
-      setCurrentStageIndex(1);
-      setEvaluationPhase('Extracting candidate sections, qualifications, and project evidence...');
-    }, 1500);
-
-    const stageTimer2 = setTimeout(() => {
-      setCurrentStageIndex(2);
-      setEvaluationPhase('Matching requirements and retrieving candidate evidence spans...');
-    }, 4000);
-
-    const stageTimer3 = setTimeout(() => {
-      setCurrentStageIndex(3);
-      setEvaluationPhase('Verifying source provenance and contextual capability support...');
-    }, 7500);
-
-    const stageTimer4 = setTimeout(() => {
-      setCurrentStageIndex(4);
-      setEvaluationPhase('Calibrating deterministic rubric scorecards and ranking candidate results...');
-    }, 11500);
 
     try {
       const result = await api.analyzeResumes({
         files: selectedFiles,
         jobSpec: jobSpec,
       });
-
-      clearInterval(intervalId);
-      clearTimeout(stageTimer1);
-      clearTimeout(stageTimer2);
-      clearTimeout(stageTimer3);
-      clearTimeout(stageTimer4);
-      setCurrentStageIndex(5); // all stages complete
 
       if (!result || result.total_successful === 0 || !result.ranked_candidates || result.ranked_candidates.length === 0) {
         const failureMsg =
@@ -244,19 +212,9 @@ export function ScreeningProvider({ children }) {
         setInspectedCandidateId(result.ranked_candidates[0].candidate_id);
       }
     } catch (err) {
-      clearInterval(intervalId);
-      clearTimeout(stageTimer1);
-      clearTimeout(stageTimer2);
-      clearTimeout(stageTimer3);
-      clearTimeout(stageTimer4);
       setErrorMessage(err.message || 'Screening execution failed.');
       setActiveStepInternal('resumes');
     } finally {
-      clearInterval(intervalId);
-      clearTimeout(stageTimer1);
-      clearTimeout(stageTimer2);
-      clearTimeout(stageTimer3);
-      clearTimeout(stageTimer4);
       setIsScreening(false);
       setEvaluationPhase('idle');
     }
