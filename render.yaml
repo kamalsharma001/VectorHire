@@ -27,7 +27,7 @@ services:
       - key: GROQ_FALLBACK_MODEL
         value: qwen/qwen3.8-27b
       - key: CORS_ORIGINS
-        value: "https://vectorhire-platform.vercel.app"
+        value: "https://vectorhire-platform.vercel.app,http://localhost:5173,http://127.0.0.1:5173"
       - key: UNCERTAINTY_DISCOUNT_GAMMA
         value: "0.50"
       - key: MAX_BATCH_SIZE

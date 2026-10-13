@@ -62,12 +62,21 @@ def create_app() -> FastAPI:
     app.max_body_size = None
 
     # CORS configuration
-    raw_origins = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
-    cors_origins = raw_origins if raw_origins else ["*"]
+    base_origins = [
+        "https://vectorhire-platform.vercel.app",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ]
+    configured_origins = [
+        o.strip()
+        for o in settings.CORS_ORIGINS.split(",")
+        if o.strip() and o.strip() != "*"
+    ]
+    cors_origins = list(dict.fromkeys(base_origins + configured_origins))
     app.add_middleware(
         CORSMiddleware,
         allow_origins=cors_origins,
-        allow_credentials=True,
+        allow_credentials=False,
         allow_methods=["*"],
         allow_headers=["*"],
     )

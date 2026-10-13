@@ -26,8 +26,8 @@ class Settings(BaseSettings):
     HOST: str = "127.0.0.1"
     PORT: int = 8000
     CORS_ORIGINS: str = Field(
-        default="*",
-        description="Comma-separated list of allowed CORS origins, or '*' for all origins"
+        default="https://vectorhire-platform.vercel.app,http://localhost:5173,http://127.0.0.1:5173",
+        description="Comma-separated list of allowed CORS origins"
     )
 
     # LLM Provider Configuration (gemini or groq)
