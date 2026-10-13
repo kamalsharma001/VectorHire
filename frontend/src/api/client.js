@@ -223,24 +223,34 @@ export const api = {
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
-        const parts = buffer.split('\n\n');
-        buffer = parts.pop() || '';
+        
+        // Normalize CRLF to LF
+        buffer = buffer.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
-        for (const part of parts) {
-          if (!part.trim()) continue;
+        // SSE messages are delimited by a double newline
+        let boundaryIndex;
+        while ((boundaryIndex = buffer.indexOf('\n\n')) !== -1) {
+          const rawMessage = buffer.slice(0, boundaryIndex);
+          buffer = buffer.slice(boundaryIndex + 2);
+
+          if (!rawMessage.trim()) continue;
 
           let eventType = 'message';
-          let dataStr = '';
+          const dataLines = [];
 
-          for (const line of part.split('\n')) {
-            if (line.startsWith('event: ')) {
-              eventType = line.slice(7).trim();
-            } else if (line.startsWith('data: ')) {
-              dataStr = line.slice(6);
+          for (const line of rawMessage.split('\n')) {
+            if (line.startsWith('event:')) {
+              eventType = line.slice(6).trim();
+            } else if (line.startsWith('data:')) {
+              // Strip optional single leading space per SSE specification
+              let d = line.slice(5);
+              if (d.startsWith(' ')) d = d.slice(1);
+              dataLines.push(d);
             }
           }
 
-          if (!dataStr) continue;
+          if (dataLines.length === 0) continue;
+          const dataStr = dataLines.join('\n');
 
           let parsedData;
           try {
@@ -249,6 +259,44 @@ export const api = {
             parsedData = dataStr;
           }
 
+          if (eventType === 'stage_start') {
+            if (onStageStart) onStageStart(parsedData);
+          } else if (eventType === 'stage_complete') {
+            if (onStageComplete) onStageComplete(parsedData);
+          } else if (eventType === 'complete') {
+            finalResult = parsedData;
+          } else if (eventType === 'error') {
+            const errMsg =
+              typeof parsedData === 'object' && parsedData?.error
+                ? parsedData.error
+                : String(parsedData);
+            throw new ApiError(errMsg, 422, parsedData);
+          }
+        }
+      }
+
+      // Check any remaining buffer upon stream completion
+      if (buffer.trim()) {
+        const rawMessage = buffer.trim();
+        let eventType = 'message';
+        const dataLines = [];
+        for (const line of rawMessage.split('\n')) {
+          if (line.startsWith('event:')) {
+            eventType = line.slice(6).trim();
+          } else if (line.startsWith('data:')) {
+            let d = line.slice(5);
+            if (d.startsWith(' ')) d = d.slice(1);
+            dataLines.push(d);
+          }
+        }
+        if (dataLines.length > 0) {
+          const dataStr = dataLines.join('\n');
+          let parsedData;
+          try {
+            parsedData = JSON.parse(dataStr);
+          } catch {
+            parsedData = dataStr;
+          }
           if (eventType === 'stage_start') {
             if (onStageStart) onStageStart(parsedData);
           } else if (eventType === 'stage_complete') {

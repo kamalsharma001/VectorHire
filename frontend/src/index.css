@@ -75,30 +75,6 @@
     @apply bg-white border border-[#E2E8F0] rounded-2xl shadow-subtle hover:border-[#BAE6FD]/80 transition-all duration-200;
   }
 
-  /* Active Stage Orbital Light */
-  @keyframes activeMarkerOrbit {
-    from {
-      transform: rotate(0deg);
-    }
-    to {
-      transform: rotate(360deg);
-    }
-  }
-
-  .orbital-light-runner {
-    animation: activeMarkerOrbit 2.5s linear infinite;
-    transform-origin: center center;
-    will-change: transform;
-  }
-
-  .active-stage-card {
-    position: relative;
-    background: #F0F9FF;
-    border: 1px solid #06B6D4;
-    border-radius: 0.75rem;
-    z-index: 1;
-  }
-
   /* Vibrant Gradient Text Utility */
   .gradient-text-ocean {
     @apply bg-gradient-to-r from-[#075985] via-[#0369A1] to-[#06B6D4] bg-clip-text text-transparent;
@@ -107,6 +83,36 @@
   .gradient-text-ai {
     @apply bg-gradient-to-r from-[#0369A1] via-[#06B6D4] to-[#8B5CF6] bg-clip-text text-transparent;
   }
+}
+
+/* Evaluation Waiting Panel - 3 Dots Sequential Wave */
+@keyframes dotBounceWave {
+  0%, 100% {
+    transform: translateY(0);
+    opacity: 0.7;
+  }
+  50% {
+    transform: translateY(-6px);
+    opacity: 1;
+  }
+}
+
+.eval-dot-1 {
+  display: inline-block;
+  animation: dotBounceWave 1.2s ease-in-out infinite 0s !important;
+  will-change: transform;
+}
+
+.eval-dot-2 {
+  display: inline-block;
+  animation: dotBounceWave 1.2s ease-in-out infinite 0.2s !important;
+  will-change: transform;
+}
+
+.eval-dot-3 {
+  display: inline-block;
+  animation: dotBounceWave 1.2s ease-in-out infinite 0.4s !important;
+  will-change: transform;
 }
 
 /* Custom styled Range Inputs for Rubric Calibration */
@@ -119,16 +125,11 @@ input[type="range"]:focus {
 
 /* Reduced motion accessibility support */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  ::before,
-  ::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
-
-  .orbital-light-runner {
+  .eval-dot-1,
+  .eval-dot-2,
+  .eval-dot-3 {
     animation: none !important;
+    transform: none !important;
+    opacity: 1 !important;
   }
 }

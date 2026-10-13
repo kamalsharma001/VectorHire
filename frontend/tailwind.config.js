@@ -108,6 +108,9 @@ export default {
         'pulse-subtle': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
         'fade-in': 'fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards',
         'slide-up': 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+        'eval-dot-1': 'dotBounceWave 1.2s ease-in-out infinite 0s',
+        'eval-dot-2': 'dotBounceWave 1.2s ease-in-out infinite 0.2s',
+        'eval-dot-3': 'dotBounceWave 1.2s ease-in-out infinite 0.4s',
       },
       keyframes: {
         fadeIn: {
@@ -117,6 +120,10 @@ export default {
         slideUp: {
           '0%': { opacity: '0', transform: 'translateY(12px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        dotBounceWave: {
+          '0%, 100%': { transform: 'translateY(0)', opacity: '0.7' },
+          '50%': { transform: 'translateY(-6px)', opacity: '1' },
         },
       },
     },

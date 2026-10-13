@@ -324,28 +324,36 @@ export function ScreeningProvider({ children }) {
     setActiveStepInternal('evaluation');
     setCurrentStageIndex(0);
     setCompletedStages([]);
-    setEvaluationPhase('Validating candidate document format, integrity, and resume structure...');
+    setEvaluationPhase('Preparing candidate documents…');
     setErrorMessage(null);
 
     try {
       const result = await api.analyzeResumesStream({
         files: selectedFiles,
         jobSpec: jobSpec,
-        onStageStart: ({ stage_index, message, stage_title }) => {
-          setCurrentStageIndex(stage_index);
-          if (message) setEvaluationPhase(message);
-        },
-        onStageComplete: ({ stage_index, message }) => {
-          setCompletedStages((prev) => (prev.includes(stage_index) ? prev : [...prev, stage_index]));
-          if (stage_index < 4) {
-            setCurrentStageIndex(stage_index + 1);
+        onStageStart: ({ stage_index }) => {
+          if (typeof stage_index === 'number') {
+            setCurrentStageIndex(stage_index);
+            // Honest, friendly messages aligned with genuine pipeline phases
+            if (stage_index === 0) {
+              setEvaluationPhase('Preparing candidate documents…');
+            } else if (stage_index === 1 || stage_index === 2) {
+              setEvaluationPhase('Matching resumes against job requirements…');
+            } else if (stage_index === 3) {
+              setEvaluationPhase('Validating supporting evidence…');
+            } else if (stage_index === 4) {
+              setEvaluationPhase('Preparing candidate results…');
+            } else {
+              setEvaluationPhase('Evaluating candidate evidence…');
+            }
           }
-          if (message) setEvaluationPhase(message);
+        },
+        onStageComplete: ({ stage_index }) => {
+          if (typeof stage_index === 'number') {
+            setCompletedStages((prev) => (prev.includes(stage_index) ? prev : [...prev, stage_index]));
+          }
         },
       });
-
-      setCompletedStages([0, 1, 2, 3, 4]);
-      setCurrentStageIndex(5); // all stages complete
 
       if (!result || result.total_successful === 0 || !result.ranked_candidates || result.ranked_candidates.length === 0) {
         const failureMsg =
