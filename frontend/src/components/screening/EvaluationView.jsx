@@ -55,13 +55,17 @@ export function EvaluationView() {
         {/* Active Evaluation Banner (Solid pale blue bg, solid cyan border, rotating perimeter light) */}
         <div className="p-4 sm:p-4.5 rounded-xl bg-[#F0F9FF] border border-[#BAE6FD] flex items-center justify-between gap-3.5">
           <div className="flex items-center gap-3 min-w-0">
-            {/* Active marker with rotating perimeter light indicator */}
-            <div className="relative flex-shrink-0 w-8 h-8 flex items-center justify-center">
-              <div className="absolute inset-0 active-marker-orbiter pointer-events-none" aria-hidden="true">
-                <div className="w-2 h-2 rounded-full bg-[#06B6D4] absolute top-[-3px] left-1/2 -translate-x-1/2 shadow-sm" />
+            {/* Active marker with clearly visible orbital rotating light around circular perimeter */}
+            <div className="relative flex-shrink-0 w-10 h-10 flex items-center justify-center">
+              {/* Visible circular orbit track ring */}
+              <div className="absolute inset-0 rounded-full border border-[#BAE6FD]" aria-hidden="true" />
+              {/* Orbital traveling light rotating continuously around circular track */}
+              <div className="absolute inset-0 rounded-full active-marker-orbiter pointer-events-none" aria-hidden="true">
+                <div className="w-2.5 h-2.5 rounded-full bg-[#06B6D4] absolute top-[-4px] left-1/2 -translate-x-1/2 shadow-sm" />
               </div>
-              <div className="w-8 h-8 rounded-lg bg-[#0369A1] text-white border border-[#06B6D4] flex items-center justify-center">
-                <Sparkles className="w-4 h-4 text-white" />
+              {/* Central status icon */}
+              <div className="w-7 h-7 rounded-full bg-[#0369A1] text-white flex items-center justify-center shadow-subtle">
+                <Sparkles className="w-3.5 h-3.5 text-white" />
               </div>
             </div>
 

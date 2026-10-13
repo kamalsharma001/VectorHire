@@ -75,12 +75,12 @@
     @apply bg-white border border-[#E2E8F0] rounded-2xl shadow-subtle hover:border-[#BAE6FD]/80 transition-all duration-200;
   }
 
-  /* Active Stage Perimeter Marker Rotation (Solid Colors Only, Confined to Marker) */
+  /* Active Stage Perimeter Marker Rotation (Solid Colors Only, Confined to Circular Ring) */
   @keyframes activeMarkerOrbit {
-    0% {
+    from {
       transform: rotate(0deg);
     }
-    100% {
+    to {
       transform: rotate(360deg);
     }
   }
@@ -93,8 +93,9 @@
   }
 
   .active-marker-orbiter {
-    animation: activeMarkerOrbit 2.4s linear infinite;
+    animation: activeMarkerOrbit 2s linear infinite;
     transform-origin: 50% 50%;
+    will-change: transform;
   }
 
   /* Vibrant Gradient Text Utility */
